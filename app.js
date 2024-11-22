@@ -3,6 +3,11 @@ const cors = require('cors')
 const mongoose = require('mongoose')
 const userRouter = require('./router/user')
 
+const connectDb = async () => {
+  await mongoose.connect('mongodb://127.0.0.1:27017/main')
+}
+connectDb()
+
 const app = express()
 app.use(cors())
 app.use(express.urlencoded({ extended: false }))
