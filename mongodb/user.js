@@ -11,6 +11,7 @@ const userSchema = new Schema({
 	age: Number,
 	idCard: String,
 	birthDate: String,
+	phone: String,
 	email: String,
 	avatar: String,
 	friendBg: String,
