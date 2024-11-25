@@ -27,15 +27,12 @@
   "[vue]": {
     "editor.defaultFormatter": "octref.vetur"
   },
-  // 默认使用prettier格式化支持的文件
   "vetur.format.defaultFormatter.js": "prettier",
   "vetur.format.defaultFormatter.html": "prettyhtml",
   "vetur.format.defaultFormatterOptions": {
     "prettier": {
-      // 结尾无分号
       "semi": false,
-      // 超过140个字符换行
-      "printWidth": 140,
+      "printWidth": 100,
       // 使用单引号
       "singleQuote": true,
       // 无尾随逗号
@@ -48,7 +45,7 @@
     }
   },
   "editor.formatOnSave": true,
-  "editor.tabSize": 4,
+  "editor.tabSize": 2,
   // false去掉代码结尾的分号
   "prettier.semi": false,
   // 使用带引号替代双引号
@@ -56,7 +53,7 @@
   // 去除最后一个对象结尾的逗号
   "prettier.trailingComma": "none",
   // 超过140字符进行换行
-  "prettier.printWidth": 140,
+  "prettier.printWidth": 100,
   // (x) => {} 是否要有小括号默认avoid不要，always要
   "prettier.arrowParens": "avoid",
 }
