@@ -88,11 +88,12 @@ const codeLogin = async (req, res) => {
 		if (existingUser) {
 			user = existingUser
 		} else {
-			token = generateToken(user)
 			user = new User({
 				email: account,
 				password: bcrypt.hashSync(authCode, 10)
 			})
+			token = generateToken(user)
+			await user.save()
 		}
 		user.lastLoginDate = new Date()
 		token = generateToken(user)
