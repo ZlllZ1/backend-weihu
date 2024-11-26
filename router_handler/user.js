@@ -1,27 +1,34 @@
 const User = require('../mongodb/user.js')
-const bcrypt = require('bcrypt')
-const ApiResponse = require('../utils/response.js')
 
-exports.register = async (req, res) => {
-	const { account, password } = req.body
-	if (account.length < 9 || password.length < 12) {
-		return res.status(400).send('account or password length too short')
-	}
+const getUserInfo = async (req, res) => {
+	const { account } = req.query
+	if (!account) return res.sendError(400, 'account is required')
 	try {
-		const existingUser = await User.findOne({ account })
-		if (existingUser) {
-			return res.status(409).send('account already exists')
-		} else {
-			const hashedPassword = bcrypt.hashSync(password, 10)
-			const newUser = new User({ account, password: hashedPassword })
-			await newUser.save()
-			return res.ApiResponse.success('register success')
-		}
-	} catch {
-		return res.ApiResponse.error(500, 'server error')
+		const user = await User.findOne({ email: account })
+		if (!user) return res.sendError(404, 'User not found')
+		res.sendSuccess(user)
+	} catch (error) {
+		console.error('Error in getUserInfo:', error)
+		res.sendError(500, 'Internal server error')
 	}
 }
 
-exports.login = (req, res) => {
-	res.send('login OK')
+const logout = async (req, res) => {
+	const { account } = req.body
+	if (!account) return res.sendError(400, 'account is required')
+	try {
+		const user = await User.findOne({ email: account })
+		if (!user) return res.sendError(404, 'User not found')
+		user.token = null
+		await user.save()
+		res.sendSuccess({ message: 'Logout successful' })
+	} catch (error) {
+		console.error('Error in logout:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+module.exports = {
+	getUserInfo,
+	logout
 }

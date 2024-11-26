@@ -2,7 +2,6 @@ const { mongoose } = require('./index.js')
 const Schema = mongoose.Schema
 
 const userSchema = new Schema({
-	userId: String,
 	account: String,
 	password: String,
 	token: String,

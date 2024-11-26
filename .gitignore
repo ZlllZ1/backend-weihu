@@ -10,7 +10,6 @@ yarn-error.log*
 pids
 *.pid
 *.seed
-*.pid.lock
 
 # 目录
 /dist

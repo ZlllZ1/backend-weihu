@@ -3,8 +3,8 @@ const userHandler = require('../router_handler/user')
 
 const router = express.Router()
 
-router.post('/register', userHandler.register)
+router.get('/getUserInfo', userHandler.getUserInfo)
 
-router.post('/login', userHandler.login)
+router.post('/logout', userHandler.logout)
 
 module.exports = router
