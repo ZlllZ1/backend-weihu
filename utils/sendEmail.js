@@ -25,7 +25,6 @@ module.exports.send163 = mailOptions => {
 		if (error) {
 			return console.log(error)
 		}
-		console.log('success')
 	})
 }
 
@@ -34,6 +33,5 @@ module.exports.sendQQ = mailOptions => {
 		if (error) {
 			return console.log(error)
 		}
-		console.log('success')
 	})
 }

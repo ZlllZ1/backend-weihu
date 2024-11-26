@@ -91,11 +91,14 @@ const codeLogin = async (req, res) => {
 			token = generateToken(user)
 			user = new User({
 				email: account,
-				password: bcrypt.hashSync(authCode, 10),
-				token: token
+				password: bcrypt.hashSync(authCode, 10)
 			})
-			await user.save()
 		}
+		user.lastLoginDate = new Date()
+		token = generateToken(user)
+		user.token = token
+		await user.save()
+		await AuthCode.deleteMany({ email: account })
 		return res.sendSuccess({ token }, 'Login/Register success')
 	} catch (error) {
 		console.error(error)
