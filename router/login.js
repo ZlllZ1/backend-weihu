@@ -5,6 +5,8 @@ const router = express.Router()
 
 router.post('/sendAuthCode', loginHandler.sendAuthCode)
 
+router.post('/judgeAuthCode', loginHandler.judgeAuthCode)
+
 router.post('/codeLogin', loginHandler.codeLogin)
 
 router.post('/passwordLogin', loginHandler.passwordLogin)
