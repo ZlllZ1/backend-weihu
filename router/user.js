@@ -5,7 +5,7 @@ const router = express.Router()
 
 router.get('/getUserInfo', userHandler.getUserInfo)
 
-router.post('/logout', userHandler.logout)
+// router.post('/logout', userHandler.logout)
 
 router.post('/changeNickname', userHandler.changeNickname)
 
