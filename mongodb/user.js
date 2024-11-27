@@ -6,7 +6,7 @@ const userSchema = new Schema({
 	password: String,
 	token: String,
 	nickname: String,
-	sex: String,
+	sex: Number,
 	age: Number,
 	idCard: String,
 	birthDate: String,
@@ -14,6 +14,8 @@ const userSchema = new Schema({
 	email: String,
 	avatar: String,
 	friendBg: String,
+	homeBg: String,
+	ipRegion: String,
 	registrationDate: { type: Date, default: Date.now },
 	lastLoginDate: { type: Date, default: Date.now }
 })

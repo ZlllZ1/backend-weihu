@@ -11,7 +11,7 @@ const generateToken = user => {
 			email: user.email
 		},
 		process.env.JWT_SECRET,
-		{ expiresIn: '1d' }
+		{ expiresIn: '3h' }
 	)
 }
 
@@ -69,14 +69,14 @@ const sendAuthCode = async (req, res) => {
 		await AuthCode.deleteMany({ email: account })
 		await authCode.save()
 		res.sendSuccess('Verification code sent successfully')
-	} catch {
+	} catch (error) {
 		console.error('Error in sendAuthCode:', error)
 		res.sendError(500, 'Internal server error')
 	}
 }
 
 const codeLogin = async (req, res) => {
-	const { account, authCode } = req.body
+	const { account, authCode, type = '' } = req.body
 	if (!account || !authCode) return res.sendError(400, 'account or authCode is required')
 	try {
 		const existingUser = await User.findOne({ email: account })
@@ -87,17 +87,25 @@ const codeLogin = async (req, res) => {
 		let token
 		if (existingUser) {
 			user = existingUser
+			user.lastLoginDate = new Date().toISOString().split('T')[0]
 		} else {
 			user = new User({
 				email: account,
-				password: bcrypt.hashSync(authCode, 10)
+				password: bcrypt.hashSync(authCode, 10),
+				nickname: account,
+				sex: 2,
+				birthDate: new Date().toISOString().split('T')[0],
+				registrationDate: new Date().toISOString().split('T')[0],
+				lastLoginDate: new Date().toISOString().split('T')[0]
 			})
 			token = generateToken(user)
 			await user.save()
 		}
 		user.lastLoginDate = new Date()
+		if (type !== 'auth') {
+			user.token = token
+		}
 		token = generateToken(user)
-		user.token = token
 		await user.save()
 		await AuthCode.deleteMany({ email: account })
 		return res.sendSuccess({ token }, 'Login/Register success')
