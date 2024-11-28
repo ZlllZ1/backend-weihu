@@ -15,4 +15,6 @@ router.post('/changePassword', userHandler.changePassword)
 
 router.post('/changeIntroduction', userHandler.changeIntroduction)
 
+router.post('/changeBirthDate', userHandler.changeBirthDate)
+
 module.exports = router

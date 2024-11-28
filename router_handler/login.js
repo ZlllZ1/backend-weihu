@@ -81,7 +81,8 @@ const codeLogin = async (req, res) => {
 				nickname: account,
 				sex: 2,
 				birthDate: new Date().toISOString().split('T')[0],
-				registrationDate: new Date()
+				registrationDate: new Date(),
+				age: new Date().getFullYear() - new Date(user.birthDate).getFullYear()
 			})
 		user.lastLoginDate = new Date()
 		user.token = generateToken(user)

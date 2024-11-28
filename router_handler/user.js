@@ -85,11 +85,27 @@ const changeIntroduction = async (req, res) => {
 	}
 }
 
+const changeBirthDate = async (req, res) => {
+	const { account, birthDate } = req.body
+	if (!account || !birthDate) return res.sendError(400, 'account or birthDate is required')
+	try {
+		const user = await User.findOne({ email: account })
+		if (!user) return res.sendError(404, 'User not found')
+		user.birthDate = birthDate
+		user.age = new Date().getFullYear() - new Date(birthDate).getFullYear()
+		await user.save()
+		res.sendSuccess({ message: 'BirthDate changed successfully' })
+	} catch (error) {
+		console.error('Error in changeBirthDate:', error)
+	}
+}
+
 module.exports = {
 	getUserInfo,
 	changeNickname,
 	changeSex,
 	changeEmail,
 	changePassword,
-	changeIntroduction
+	changeIntroduction,
+	changeBirthDate
 }
