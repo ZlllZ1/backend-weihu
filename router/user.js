@@ -11,4 +11,6 @@ router.post('/changeSex', userHandler.changeSex)
 
 router.post('/changeEmail', userHandler.changeEmail)
 
+router.post('/changePassword', userHandler.changePassword)
+
 module.exports = router

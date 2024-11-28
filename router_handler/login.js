@@ -94,15 +94,18 @@ const codeLogin = async (req, res) => {
 }
 
 const passwordLogin = async (req, res) => {
-	const { account, password } = req.body
-	if (!account || !password) return res.sendError(400, 'account or password is required')
 	try {
+		const { account, password } = req.body
+		if (!account || !password) return res.sendError(400, 'account or password is required')
 		const user = await User.findOne({ email: account })
 		if (!user) return res.sendError(400, 'Invalid account')
-		const isValid = bcrypt.compareSync(password, user.password)
+		const isValid = await bcrypt.compareSync(password, user.password)
 		if (!isValid) return res.sendError(400, 'Invalid password')
 		const token = generateToken(user)
-		return res.ApiResponse.success({ token }, 'Login success')
+		user.token = token
+		user.lastLoginDate = new Date()
+		await user.save()
+		return res.sendSuccess({ token: user.token }, 'Login success')
 	} catch (error) {
 		return res.sendError(500, 'An error occurred during login')
 	}
