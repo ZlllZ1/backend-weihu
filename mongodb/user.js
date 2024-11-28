@@ -13,6 +13,7 @@ const userSchema = new Schema({
 	phone: String,
 	email: String,
 	avatar: String,
+	introduction: String,
 	friendBg: String,
 	homeBg: String,
 	ipRegion: String,

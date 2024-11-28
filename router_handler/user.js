@@ -71,10 +71,25 @@ const changePassword = async (req, res) => {
 	}
 }
 
+const changeIntroduction = async (req, res) => {
+	const { account, introduction } = req.body
+	if (!account || !introduction) return res.sendError(400, 'account or introduction is required')
+	try {
+		const user = await User.findOne({ email: account })
+		if (!user) return res.sendError(404, 'User not found')
+		user.introduction = introduction
+		await user.save()
+		res.sendSuccess({ message: 'Introduction changed successfully' })
+	} catch (error) {
+		console.error('Error in changeIntroduction:', error)
+	}
+}
+
 module.exports = {
 	getUserInfo,
 	changeNickname,
 	changeSex,
 	changeEmail,
-	changePassword
+	changePassword,
+	changeIntroduction
 }
