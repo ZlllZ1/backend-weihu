@@ -12,7 +12,7 @@ app.use(cors())
 app.use(express.urlencoded({ extended: false }))
 app.use(express.json())
 app.use(apiResponseMiddleware)
-app.use('/user', userRouter)
+app.use('/user', verifyToken, userRouter)
 app.use('/login', loginRouter)
 
 const startServer = async () => {
