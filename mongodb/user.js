@@ -17,7 +17,7 @@ const userSchema = new Schema({
 	friendBg: String,
 	homeBg: String,
 	live: String,
-	ipRegion: String,
+	ipAddress: String,
 	registrationDate: { type: Date, default: Date.now },
 	lastLoginDate: { type: Date, default: Date.now }
 })

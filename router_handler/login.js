@@ -64,9 +64,9 @@ const judgeAuthCode = async (req, res) => {
 }
 
 const codeLogin = async (req, res) => {
-	const { account, authCode } = req.body
-	if (!account || !authCode) return res.sendError(400, 'account or authCode is required')
 	try {
+		const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress
+		if (!account || !authCode) return res.sendError(400, 'account or authCode is required')
 		const [existingUser, authCodeDoc] = await Promise.all([
 			User.findOne({ email: account }),
 			AuthCode.findOne({ email: account })
@@ -85,6 +85,7 @@ const codeLogin = async (req, res) => {
 				age: new Date().getFullYear() - new Date(user.birthDate).getFullYear()
 			})
 		user.lastLoginDate = new Date()
+		user.ipAddress = ipAddress
 		user.token = generateToken(user)
 		await Promise.all([user.save(), AuthCode.deleteMany({ email: account })])
 		return res.sendSuccess({ token: user.token }, 'Register/Login success')
@@ -97,14 +98,15 @@ const codeLogin = async (req, res) => {
 const passwordLogin = async (req, res) => {
 	try {
 		const { account, password } = req.body
+		const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress
 		if (!account || !password) return res.sendError(400, 'account or password is required')
 		const user = await User.findOne({ email: account })
 		if (!user) return res.sendError(400, 'Invalid account')
 		const isValid = await bcrypt.compareSync(password, user.password)
 		if (!isValid) return res.sendError(400, 'Invalid password')
-		const token = generateToken(user)
-		user.token = token
 		user.lastLoginDate = new Date()
+		user.ipAddress = ipAddress
+		user.token = generateToken(user)
 		await user.save()
 		return res.sendSuccess({ token: user.token }, 'Login success')
 	} catch (error) {

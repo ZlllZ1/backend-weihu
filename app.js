@@ -8,6 +8,8 @@ const userRouter = require('./router/user')
 const loginRouter = require('./router/login')
 
 const app = express()
+
+app.set('trust proxy', true)
 app.use(cors())
 app.use(express.urlencoded({ extended: false }))
 app.use(express.json())
