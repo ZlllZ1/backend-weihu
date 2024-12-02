@@ -9,6 +9,8 @@ router.get('/getUserInfo', userHandler.getUserInfo)
 
 router.post('/changeNickname', userHandler.changeNickname)
 
+router.post('/changeLive', userHandler.changeLive)
+
 router.post('/changeSex', userHandler.changeSex)
 
 router.post('/changeEmail', userHandler.changeEmail)

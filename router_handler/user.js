@@ -32,6 +32,21 @@ const changeNickname = async (req, res) => {
 	}
 }
 
+const changeLive = async (req, res) => {
+	const { account, live } = req.body
+	if (!account || !live) return res.sendError(400, 'account or live is required')
+	try {
+		const user = await User.findOne({ email: account })
+		if (!user) return res.sendError(404, 'User not found')
+		user.live = live
+		await user.save()
+		res.sendSuccess({ message: 'Live changed successfully' })
+	} catch (error) {
+		console.error('Error in changeLive:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 const changeSex = async (req, res) => {
 	const { account, sex } = req.body
 	if (!account) return res.sendError(400, 'account is required')
@@ -190,5 +205,6 @@ module.exports = {
 	changeBirthDate,
 	changeAvatar,
 	changeHomeBg,
-	changeCircleBg
+	changeCircleBg,
+	changeLive
 }

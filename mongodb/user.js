@@ -16,6 +16,7 @@ const userSchema = new Schema({
 	introduction: String,
 	friendBg: String,
 	homeBg: String,
+	live: String,
 	ipRegion: String,
 	registrationDate: { type: Date, default: Date.now },
 	lastLoginDate: { type: Date, default: Date.now }
