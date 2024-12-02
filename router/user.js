@@ -1,5 +1,7 @@
 const express = require('express')
 const userHandler = require('../router_handler/user')
+const multer = require('multer')
+const upload = multer({ dest: 'uploads/' })
 
 const router = express.Router()
 
@@ -16,5 +18,11 @@ router.post('/changePassword', userHandler.changePassword)
 router.post('/changeIntroduction', userHandler.changeIntroduction)
 
 router.post('/changeBirthDate', userHandler.changeBirthDate)
+
+router.post('/changeAvatar', upload.single('avatar'), userHandler.changeAvatar)
+
+router.post('/changeHomeBg', upload.single('homeBg'), userHandler.changeHomeBg)
+
+router.post('/changeCircleBg', upload.single('circleBg'), userHandler.changeCircleBg)
 
 module.exports = router

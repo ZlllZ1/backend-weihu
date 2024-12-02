@@ -14,6 +14,7 @@ pids
 # 目录
 /dist
 /build
+/uploads
 
 # 密钥文件
 .env
