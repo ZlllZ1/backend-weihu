@@ -8,8 +8,23 @@ const getUserInfo = async (req, res) => {
 	const { account } = req.query
 	if (!account) return res.sendError(400, 'account is required')
 	try {
-		const user = await User.findOne({ email: account })
+		const user = await User.findOne({ email: account }).populate('setting').lean()
 		if (!user) return res.sendError(404, 'User not found')
+		if (!user.setting) {
+			user.setting = {
+				showIp: true,
+				showFan: true,
+				showFollow: true,
+				showFriend: true,
+				showPraise: true,
+				showLive: true,
+				showCollect: true,
+				showShare: true,
+				chatLimit: 0,
+				circleLimit: 0,
+				postLimit: 0
+			}
+		}
 		res.sendSuccess(user)
 	} catch (error) {
 		console.error('Error in getUserInfo:', error)

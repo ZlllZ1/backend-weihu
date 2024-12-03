@@ -19,7 +19,8 @@ const userSchema = new Schema({
 	live: String,
 	ipAddress: String,
 	registrationDate: { type: Date, default: Date.now },
-	lastLoginDate: { type: Date, default: Date.now }
+	lastLoginDate: { type: Date, default: Date.now },
+	setting: { type: mongoose.Schema.Types.ObjectId, ref: 'Setting' }
 })
 
 const User = mongoose.model('User', userSchema)

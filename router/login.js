@@ -1,6 +1,5 @@
 const express = require('express')
 const loginHandler = require('../router_handler/login')
-
 const router = express.Router()
 
 router.post('/sendAuthCode', loginHandler.sendAuthCode)

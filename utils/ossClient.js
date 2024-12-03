@@ -25,7 +25,6 @@ class OssClient {
 			const result = await this.client.put(ossPath, path.normalize(localPath), {
 				headers: this.headers
 			})
-			console.log(result)
 			return result
 		} catch (error) {
 			console.error('上传文件失败', error)

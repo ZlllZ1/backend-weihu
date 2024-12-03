@@ -1,5 +1,7 @@
 const AuthCode = require('../mongodb/authCode.js')
+const Setting = require('../mongodb/setting.js')
 const User = require('../mongodb/user.js')
+
 const {
 	EMAIL_PROVIDERS,
 	generateEmailCode,
@@ -66,6 +68,7 @@ const judgeAuthCode = async (req, res) => {
 const codeLogin = async (req, res) => {
 	try {
 		const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress
+		const { account, authCode } = req.body
 		if (!account || !authCode) return res.sendError(400, 'account or authCode is required')
 		const [existingUser, authCodeDoc] = await Promise.all([
 			User.findOne({ email: account }),
@@ -73,6 +76,11 @@ const codeLogin = async (req, res) => {
 		])
 		if (!authCodeDoc || authCode !== authCodeDoc.code || Date.now() > authCodeDoc.expires)
 			return res.sendError(400, 'Invalid or expired auth code')
+		const setting = await Setting.findOneAndUpdate(
+			{ email: account },
+			{ email: account },
+			{ upsert: true, new: true }
+		)
 		const user =
 			existingUser ||
 			new User({
@@ -82,12 +90,14 @@ const codeLogin = async (req, res) => {
 				sex: 2,
 				birthDate: new Date().toISOString().split('T')[0],
 				registrationDate: new Date(),
-				age: new Date().getFullYear() - new Date(user.birthDate).getFullYear()
+				age:
+					new Date().getFullYear() - new Date(new Date().toISOString().split('T')[0]).getFullYear(),
+				setting: setting._id
 			})
 		user.lastLoginDate = new Date()
 		user.ipAddress = ipAddress
 		user.token = generateToken(user)
-		await Promise.all([user.save(), AuthCode.deleteMany({ email: account })])
+		await Promise.all([user.save(), setting.save(), AuthCode.deleteMany({ email: account })])
 		return res.sendSuccess({ token: user.token }, 'Register/Login success')
 	} catch (error) {
 		console.error(error)

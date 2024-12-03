@@ -6,6 +6,7 @@ const verifyToken = require('./utils/verifyToken.js')
 const apiResponseMiddleware = require('./utils/apiResponseMiddleware.js')
 const userRouter = require('./router/user')
 const loginRouter = require('./router/login')
+const settingRouter = require('./router/setting')
 
 const app = express()
 
@@ -14,8 +15,10 @@ app.use(cors())
 app.use(express.urlencoded({ extended: false }))
 app.use(express.json())
 app.use(apiResponseMiddleware)
-app.use('/user', verifyToken, userRouter)
+
 app.use('/login', loginRouter)
+app.use('/user', verifyToken, userRouter)
+app.use('/setting', verifyToken, settingRouter)
 
 const startServer = async () => {
 	try {
