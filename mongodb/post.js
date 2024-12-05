@@ -13,7 +13,9 @@ const postSchema = new Schema({
 	praiseNum: Number,
 	commentNum: Number,
 	collectNum: Number,
-	shareNum: Number
+	shareNum: Number,
+	lookNum: Number,
+	rate: Number
 })
 
 const Post = mongoose.model('Post', postSchema)
