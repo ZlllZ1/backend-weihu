@@ -17,7 +17,6 @@ const commitErrorLog = async (req, res) => {
 
 const changePassword = async (req, res) => {
 	const { account, password } = req.body
-	console.log(account, password)
 	if (!account || !password) return res.sendError(400, 'account or password is required')
 	try {
 		const user = await User.findOne({ email: account })

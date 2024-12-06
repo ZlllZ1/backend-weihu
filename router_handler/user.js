@@ -145,12 +145,16 @@ const changeAvatar = async (req, res) => {
 	try {
 		const user = await User.findOne({ email: account })
 		if (!user) return res.sendError(404, 'User not found')
-		if (user.avatar) {
-			const oldAvatarKey = user.avatar.split('/').pop()
-			await OssClient.deleteFile(`avatars/${oldAvatarKey}`)
-		}
 		const fileExt = path.extname(req.file.originalname)
 		const ossPath = `avatar/${user._id}${fileExt}`
+		if (user.avatar) {
+			const oldAvatarKey = user.avatar.split('/').pop()
+			try {
+				await OssClient.deleteFile(`avatars/${oldAvatarKey}`)
+			} catch (error) {
+				console.error('Error in deleteFile:', error)
+			}
+		}
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
 		user.avatar = result.url
 		await user.save()
@@ -169,12 +173,16 @@ const changeHomeBg = async (req, res) => {
 	try {
 		const user = await User.findOne({ email: account })
 		if (!user) return res.sendError(404, 'User not found')
-		if (user.homeBg) {
-			const oldHomeBgKey = user.homeBg.split('/').pop()
-			await OssClient.deleteFile(`home-backgrounds/${oldHomeBgKey}`)
-		}
 		const fileExt = path.extname(req.file.originalname)
 		const ossPath = `homeBg/${user._id}${fileExt}`
+		if (user.homeBg) {
+			const oldHomeBgKey = user.homeBg.split('/').pop()
+			try {
+				await OssClient.deleteFile(`home-backgrounds/${oldHomeBgKey}`)
+			} catch (error) {
+				console.error('Error in deleteFile:', error)
+			}
+		}
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
 		user.homeBg = result.url
 		await user.save()
@@ -193,12 +201,16 @@ const changeCircleBg = async (req, res) => {
 	try {
 		const user = await User.findOne({ email: account })
 		if (!user) return res.sendError(404, 'User not found')
-		if (user.circleBg) {
-			const oldCircleBgKey = user.circleBg.split('/').pop()
-			await OssClient.deleteFile(`circle-backgrounds/${oldCircleBgKey}`)
-		}
 		const fileExt = path.extname(req.file.originalname)
 		const ossPath = `circleBg/${user._id}${fileExt}`
+		if (user.circleBg) {
+			const oldCircleBgKey = user.circleBg.split('/').pop()
+			try {
+				await OssClient.deleteFile(`circle-backgrounds/${oldCircleBgKey}`)
+			} catch (error) {
+				console.error('Error in deleteFile:', error)
+			}
+		}
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
 		user.circleBg = result.url
 		await user.save()
