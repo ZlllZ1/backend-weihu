@@ -1,4 +1,4 @@
-const Post = require('../mongodb/post.js')
+const { Post, createPost } = require('../mongodb/post.js')
 const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const { v4: uuidv4 } = require('uuid')
@@ -19,7 +19,18 @@ const uploadCover = async (req, res) => {
 }
 
 const publishPost = async (req, res) => {
-	const { postId, userId, title } = req.body
+	const { email, title, coverUrl, content, introduction } = req.body
+	if (!email || !title || !coverUrl || !content || !introduction) {
+		return res.sendError(400, 'email, title or coverUrl or content or introduction is required')
+	}
+	try {
+		const postData = { email, title, coverUrl, content, introduction, publishData: Date.now }
+		const post = await createPost(postData)
+		res.sendSuccess({ message: 'Post published successfully', postId: post.postId })
+	} catch (error) {
+		console.error('Error in publishPost:', error)
+		res.sendError(500, 'Internal server error')
+	}
 }
 
 module.exports = {
