@@ -23,7 +23,7 @@ const sendAuthCode = async (req, res) => {
 		if (!account) return res.sendError(400, 'account is required')
 		const emailCode = generateEmailCode()
 		const emailContent = createEmailContent(account, emailCode)
-		const senderEmail = '15209021323@163.com'
+		const senderEmail = '15292021323@163.com'
 		await send163(emailContent, senderEmail)
 		const authCode = new AuthCode({
 			email: account,

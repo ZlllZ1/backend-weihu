@@ -1,9 +1,9 @@
 const { Post, createPost } = require('../mongodb/post.js')
-const schedule = require('node-schedule')
 const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const { v4: uuidv4 } = require('uuid')
 const path = require('path')
+const schedule = require('node-schedule')
 const User = require('../mongodb/user.js')
 const Draft = require('../mongodb/draft.js')
 const ScheduledPost = require('../mongodb/scheduledPost.js')
@@ -57,6 +57,24 @@ const publishPost = async (req, res) => {
 	} catch (error) {
 		console.error('Error in publishPost:', error)
 		res.sendError(500, 'Internal server error')
+	}
+}
+
+const getHotPosts = async (skip = 0, limit = 10) => {
+	return Post.find({}).sort({ rate: -1 }).skip(skip).limit(limit).exec()
+}
+
+const getPosts = async (req, res) => {
+	try {
+		const page = parseInt(req.query.page) || 1
+		const limit = parseInt(req.query.limit) || 10
+		const skip = (page - 1) * limit
+		const posts = await getHotPosts(skip, limit)
+		const total = await Post.countDocuments()
+		res.sendSuccess({ posts, total, currentPage: page })
+	} catch (error) {
+		console.error('Error fetching hot posts:', error)
+		res.status(500).json({ error: '获取热门帖子时发生错误' })
 	}
 }
 
@@ -185,5 +203,6 @@ module.exports = {
 	publishPost,
 	saveToDraft,
 	getDraft,
-	publishScheduledPost
+	publishScheduledPost,
+	getPosts
 }
