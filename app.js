@@ -7,6 +7,7 @@ const apiResponseMiddleware = require('./utils/apiResponseMiddleware.js')
 const userRouter = require('./router/user')
 const loginRouter = require('./router/login')
 const settingRouter = require('./router/setting')
+const postRouter = require('./router/post')
 const otherRouter = require('./router/other')
 
 const app = express()
@@ -20,6 +21,7 @@ app.use(apiResponseMiddleware)
 app.use('/login', loginRouter)
 app.use('/user', verifyToken, userRouter)
 app.use('/setting', verifyToken, settingRouter)
+app.use('/post', verifyToken, postRouter)
 app.use('/other', otherRouter)
 
 const startServer = async () => {
