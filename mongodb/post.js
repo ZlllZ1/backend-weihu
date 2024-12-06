@@ -5,10 +5,11 @@ const postSchema = new Schema({
 	postId: { type: Number, unique: true },
 	email: String,
 	publishDate: { type: Date, default: Date.now },
-	area: String,
+	area: { type: String, default: '未知' },
 	label: { type: String, default: '' },
 	title: String,
 	content: String,
+	delta: Object,
 	coverUrl: String,
 	introduction: String,
 	praiseNum: { type: Number, default: 0 },
@@ -16,7 +17,8 @@ const postSchema = new Schema({
 	collectNum: { type: Number, default: 0 },
 	shareNum: { type: Number, default: 0 },
 	lookNum: { type: Number, default: 0 },
-	rate: { type: Number, default: 0 }
+	rate: { type: Number, default: 0 },
+	user: Object
 })
 
 const Post = mongoose.model('Post', postSchema)
@@ -25,7 +27,6 @@ const initCounter = async (sequenceName, startValue = 0) => {
 	const existingCounter = await mongoose.connection.db
 		.collection('counters')
 		.findOne({ _id: sequenceName })
-
 	if (!existingCounter) {
 		await mongoose.connection.db
 			.collection('counters')

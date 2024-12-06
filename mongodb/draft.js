@@ -3,11 +3,13 @@ const Schema = mongoose.Schema
 
 const draftsSchema = new Schema({
 	draftId: String,
-	userId: String,
-	title: String,
-	content: String,
+	email: { type: String, default: '' },
+	title: { type: String, default: '' },
+	content: { type: String, default: '' },
+	delta: Object,
 	draftDate: { type: Date, default: Date.now },
-	cover: String
+	coverUrl: { type: String, default: '' },
+	introduction: { type: String, default: '' }
 })
 
 const Drafts = mongoose.model('Drafts', draftsSchema)

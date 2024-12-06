@@ -8,4 +8,8 @@ router.post('/uploadCover', upload.single('cover'), postHandler.uploadCover)
 
 router.post('/publishPost', postHandler.publishPost)
 
+router.post('/saveToDraft', postHandler.saveToDraft)
+
+router.get('/getDraft', postHandler.getDraft)
+
 module.exports = router

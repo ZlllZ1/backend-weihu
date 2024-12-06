@@ -3,6 +3,8 @@ const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const { v4: uuidv4 } = require('uuid')
 const path = require('path')
+const User = require('../mongodb/user.js')
+const Draft = require('../mongodb/draft.js')
 
 const uploadCover = async (req, res) => {
 	try {
@@ -19,12 +21,35 @@ const uploadCover = async (req, res) => {
 }
 
 const publishPost = async (req, res) => {
-	const { email, title, coverUrl, content, introduction } = req.body
-	if (!email || !title || !coverUrl || !content || !introduction) {
-		return res.sendError(400, 'email, title or coverUrl or content or introduction is required')
+	const { email, title, coverUrl, content, introduction, delta, type } = req.body
+	if (!email || !title || !coverUrl || !content || !introduction || !delta) {
+		return res.sendError(
+			400,
+			'email, title or coverUrl or content or introduction or delta is required'
+		)
 	}
 	try {
-		const postData = { email, title, coverUrl, content, introduction, publishData: Date.now }
+		const user = await User.findOne({ email })
+		const commitUser = {
+			email: user.email,
+			nickname: user.nickname,
+			live: user.live,
+			avatar: user.avatar,
+			introduction: user.introduction
+		}
+		const postData = {
+			email,
+			title,
+			coverUrl,
+			content,
+			introduction,
+			delta,
+			publishData: Date.now,
+			user: commitUser
+		}
+		if (type === 'draft') {
+			await Draft.deleteMany({ email })
+		}
 		const post = await createPost(postData)
 		res.sendSuccess({ message: 'Post published successfully', postId: post.postId })
 	} catch (error) {
@@ -33,7 +58,51 @@ const publishPost = async (req, res) => {
 	}
 }
 
+const saveToDraft = async (req, res) => {
+	const { email, title, coverUrl, content, introduction, delta } = req.body
+	if (!email) {
+		return res.sendError(400, 'email is required')
+	}
+	try {
+		const user = await User.findOne({ email })
+		if (!user) {
+			return res.sendError(404, 'User not found')
+		}
+		const draft = new Draft({
+			email,
+			title,
+			coverUrl,
+			content,
+			introduction,
+			draftDate: Date.now(),
+			delta
+		})
+		await Draft.deleteMany({ email })
+		await draft.save()
+		res.sendSuccess({ message: 'Post saved to draft successfully' })
+	} catch (error) {
+		console.error('Error in saveToDraft:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const getDraft = async (req, res) => {
+	const { email } = req.query
+	if (!email) {
+		return res.sendError(400, 'email is required')
+	}
+	try {
+		const draft = await Draft.findOne({ email })
+		res.sendSuccess({ message: 'Post saved to draft successfully', draft })
+	} catch (error) {
+		console.error('Error in getDraft:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	uploadCover,
-	publishPost
+	publishPost,
+	saveToDraft,
+	getDraft
 }
