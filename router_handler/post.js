@@ -1,10 +1,12 @@
 const { Post, createPost } = require('../mongodb/post.js')
+const schedule = require('node-schedule')
 const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const { v4: uuidv4 } = require('uuid')
 const path = require('path')
 const User = require('../mongodb/user.js')
 const Draft = require('../mongodb/draft.js')
+const ScheduledPost = require('../mongodb/scheduledPost.js')
 
 const uploadCover = async (req, res) => {
 	try {
@@ -100,9 +102,88 @@ const getDraft = async (req, res) => {
 	}
 }
 
+const publishScheduledPost = async (req, res) => {
+	const { email, title, coverUrl, content, introduction, delta, publishDate } = req.body
+	if (!email || !title || !coverUrl || !content || !introduction || !delta) {
+		return res.sendError(
+			400,
+			'email, title or coverUrl or content or introduction or delta is required'
+		)
+	}
+	try {
+		const user = await User.findOne({ email })
+		const commitUser = {
+			email: user.email,
+			nickname: user.nickname,
+			live: user.live,
+			avatar: user.avatar,
+			introduction: user.introduction
+		}
+		const scheduledPost = {
+			email,
+			title,
+			coverUrl,
+			content,
+			introduction,
+			delta,
+			publishDate,
+			user: commitUser
+		}
+		const post = new ScheduledPost(scheduledPost)
+		await post.save()
+		res.sendSuccess({ message: 'Post published successfully', postId: post.postId })
+	} catch (error) {
+		console.error('Error in publishScheduledPost:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const publishScheduledPosts = async () => {
+	try {
+		const now = new Date()
+		const schedulePosts = await ScheduledPost.find({
+			publishDate: { $lte: now }
+		})
+		for (const post of schedulePosts) {
+			try {
+				const req = {
+					body: {
+						email: post.user.email,
+						title: post.title,
+						coverUrl: post.coverUrl,
+						content: post.content,
+						introduction: post.introduction,
+						delta: post.delta,
+						area: post.area,
+						user: post.user,
+						type: 'scheduled'
+					}
+				}
+				const res = {
+					sendSuccess: data => {
+						console.log('Post published successfully:', data)
+					},
+					sendError: (status, message) => {
+						console.error(`Error publishing post: ${status} - ${message}`)
+					}
+				}
+				await publishPost(req, res)
+				await ScheduledPost.findByIdAndDelete(post._id)
+			} catch (error) {
+				console.error('Error in publishScheduledPosts:', error)
+			}
+		}
+	} catch (error) {
+		console.error('Error in publishScheduledPosts:', error)
+	}
+}
+
+schedule.scheduleJob('* * * * *', publishScheduledPosts)
+
 module.exports = {
 	uploadCover,
 	publishPost,
 	saveToDraft,
-	getDraft
+	getDraft,
+	publishScheduledPost
 }

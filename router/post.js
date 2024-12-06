@@ -12,4 +12,6 @@ router.post('/saveToDraft', postHandler.saveToDraft)
 
 router.get('/getDraft', postHandler.getDraft)
 
+router.post('/publishScheduledPost', postHandler.publishScheduledPost)
+
 module.exports = router
