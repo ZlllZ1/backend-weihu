@@ -2,13 +2,7 @@ const AuthCode = require('../mongodb/authCode.js')
 const Setting = require('../mongodb/setting.js')
 const User = require('../mongodb/user.js')
 
-const {
-	EMAIL_PROVIDERS,
-	generateEmailCode,
-	createEmailContent,
-	send163,
-	sendQQ
-} = require('../utils/sendEmail.js')
+const { generateEmailCode, createEmailContent, send163 } = require('../utils/sendEmail.js')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 
@@ -27,15 +21,10 @@ const sendAuthCode = async (req, res) => {
 	try {
 		const { account } = req.body
 		if (!account) return res.sendError(400, 'account is required')
-		const emailProvider = Object.entries(EMAIL_PROVIDERS).find(([_, domain]) =>
-			account.includes(domain)
-		)
-		if (!emailProvider) return res.sendError(400, 'Unsupported email provider')
-		const [providerName, providerDomain] = emailProvider
 		const emailCode = generateEmailCode()
-		const emailContent = createEmailContent(account, emailCode, providerDomain)
-		if (providerName === 'QQ') sendQQ(emailContent)
-		else if (providerName === 'NETEASE') send163(emailContent)
+		const emailContent = createEmailContent(account, emailCode)
+		const senderEmail = '15209021323@163.com'
+		await send163(emailContent, senderEmail)
 		const authCode = new AuthCode({
 			email: account,
 			code: emailCode,
