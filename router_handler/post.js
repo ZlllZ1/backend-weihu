@@ -92,35 +92,25 @@ const getHotPosts = async (email, skip = 0, limit = 10) => {
 			}
 		}
 	])
-	const praise = await Promise.all(
+	const res = await Promise.all(
 		posts.map(async post => {
-			const praise = await Praise.findOne({ email, postId: post.postId })
-			return praise ? true : false
-		})
-	)
-	const collect = await Promise.all(
-		posts.map(async post => {
-			const collect = await Collect.findOne({ email, postId: post.postId })
-			return collect ? true : false
-		})
-	)
-	const user = await Promise.all(
-		posts.map(async post => {
-			const user = await User.aggregate([
-				{ $match: { email: post.email } },
-				{ $project: { _id: 0, email: 1, nickname: 1, avatar: 1 } }
+			const [praise, collect, user, isFollowing] = await Promise.all([
+				Praise.findOne({ email, postId: post.postId }).lean(),
+				Collect.findOne({ email, postId: post.postId }).lean(),
+				User.findOne({ email: post.email }, { _id: 0, email: 1, nickname: 1, avatar: 1 }).lean(),
+				Fan.findOne({ fanEmail: email, followedEmail: post.email }).lean()
 			])
-			return user
+			return {
+				...post,
+				praise: !!praise,
+				collect: !!collect,
+				user: {
+					...user,
+					isFollowing: !!isFollowing
+				}
+			}
 		})
 	)
-	const res = posts.map((post, index) => {
-		return {
-			...post,
-			praise: praise[index],
-			collect: collect[index],
-			user: user[index][0]
-		}
-	})
 	return res
 }
 
