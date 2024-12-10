@@ -5,11 +5,11 @@ const chatSchema = new Schema({
 	chatId: String,
 	users: [
 		{
-			userId: String,
+			email: String,
 			unreadCount: { type: Number, default: 0 }
 		},
 		{
-			user_id: String,
+			email: String,
 			unread_count: { type: Number, default: 0 }
 		}
 	],

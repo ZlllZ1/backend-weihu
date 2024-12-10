@@ -6,9 +6,9 @@ const connectDb = async () => {
 			.connect('mongodb://127.0.0.1:27017/main')
 			.then(() => {
 				require('../utils/task/cleanAuthCode.js')
-				require('../utils/task/calcRate.js')
 				require('../utils/task/calcPraiseNum.js')
 				require('../utils/task/calcCollectNum.js')
+				require('../utils/task/calcRate.js')
 			})
 			.catch(err => console.error(err))
 		console.log('数据库连接成功')
