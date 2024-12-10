@@ -247,18 +247,6 @@ const followUser = async (req, res) => {
 			})
 			let updateFanOp = { $inc: { followNum: -1, version: 1 } }
 			let updateFollowedOp = { $inc: { fanNum: -1, version: 1 } }
-			// const updateOperations = [
-			// 	User.findOneAndUpdate(
-			// 		{ email: fanEmail, version: fan.version },
-			// 		{ $inc: { followNum: -1, version: 1 } },
-			// 		{ new: true }
-			// 	),
-			// 	User.findOneAndUpdate(
-			// 		{ email: followedEmail, version: followedUser.version },
-			// 		{ $inc: { fanNum: -1, version: 1 } },
-			// 		{ new: true }
-			// 	)
-			// ]
 			if (isFriend) {
 				updateFanOp.$inc.friendNum = -1
 				updateFollowedOp.$inc.friendNum = -1

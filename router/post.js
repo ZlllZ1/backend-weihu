@@ -22,4 +22,6 @@ router.post('/collectPost', postHandler.collectPost)
 
 router.get('/getPostInfo', postHandler.getPostInfo)
 
+router.get('/getPublishedPost', postHandler.getPublishedPost)
+
 module.exports = router
