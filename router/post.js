@@ -16,4 +16,6 @@ router.post('/publishScheduledPost', postHandler.publishScheduledPost)
 
 router.get('/getPosts', postHandler.getPosts)
 
+router.post('/praisePost', postHandler.praisePost)
+
 module.exports = router

@@ -13,7 +13,7 @@ const generateToken = user => {
 			email: user.email
 		},
 		process.env.JWT_SECRET,
-		{ expiresIn: '3h' }
+		{ expiresIn: '1d' }
 	)
 }
 

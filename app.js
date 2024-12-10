@@ -36,7 +36,3 @@ const startServer = async () => {
 	}
 }
 startServer()
-
-app.get('/', (req, res) => {
-	res.send('hello world')
-})

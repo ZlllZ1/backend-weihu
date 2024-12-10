@@ -20,7 +20,7 @@ const postSchema = new Schema({
 	rate: { type: Number, default: 0 },
 	user: Object
 })
-
+postSchema.index({ rate: -1 })
 const Post = mongoose.model('Post', postSchema)
 
 const initCounter = async (sequenceName, startValue = 0) => {
