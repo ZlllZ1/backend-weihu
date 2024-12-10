@@ -18,4 +18,6 @@ router.get('/getPosts', postHandler.getPosts)
 
 router.post('/praisePost', postHandler.praisePost)
 
+router.post('/collectPost', postHandler.collectPost)
+
 module.exports = router

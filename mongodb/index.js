@@ -7,6 +7,8 @@ const connectDb = async () => {
 			.then(() => {
 				require('../utils/task/cleanAuthCode.js')
 				require('../utils/task/calcRate.js')
+				require('../utils/task/calcPraiseNum.js')
+				require('../utils/task/calcCollectNum.js')
 			})
 			.catch(err => console.error(err))
 		console.log('数据库连接成功')

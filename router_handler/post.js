@@ -7,6 +7,8 @@ const schedule = require('node-schedule')
 const User = require('../mongodb/user.js')
 const Draft = require('../mongodb/draft.js')
 const ScheduledPost = require('../mongodb/scheduledPost.js')
+const Praise = require('../mongodb/praise.js')
+const Collect = require('../mongodb/collect.js')
 
 const uploadCover = async (req, res) => {
 	try {
@@ -60,21 +62,73 @@ const publishPost = async (req, res) => {
 	}
 }
 
-const getHotPosts = async (skip = 0, limit = 10) => {
-	return Post.find({}).sort({ rate: -1 }).skip(skip).limit(limit).exec()
+const getHotPosts = async (email, skip = 0, limit = 10) => {
+	const posts = await Post.aggregate([
+		{ $skip: skip },
+		{ $limit: limit },
+		{ $sort: { rate: -1 } },
+		{
+			$project: {
+				_id: 0,
+				postId: 1,
+				introduction: 1,
+				title: 1,
+				coverUrl: 1,
+				praiseNum: 1,
+				collectNum: 1,
+				commentNum: 1,
+				lookNum: 1,
+				publishDate: 1,
+				email: 1
+			}
+		}
+	])
+	const praise = await Promise.all(
+		posts.map(async post => {
+			const praise = await Praise.findOne({ email, postId: post.postId })
+			return praise ? true : false
+		})
+	)
+	const collect = await Promise.all(
+		posts.map(async post => {
+			const collect = await Collect.findOne({ email, postId: post.postId })
+			return collect ? true : false
+		})
+	)
+	const user = await Promise.all(
+		posts.map(async post => {
+			const user = await User.aggregate([
+				{ $match: { email: post.email } },
+				{ $project: { _id: 0, email: 1, nickname: 1, avatar: 1 } }
+			])
+			return user
+		})
+	)
+	const res = posts.map((post, index) => {
+		return {
+			...post,
+			praise: praise[index],
+			collect: collect[index],
+			user: user[index]
+		}
+	})
+	return res
 }
 
 const getPosts = async (req, res) => {
+	const { email } = req.query
+	const skip = parseInt((req.query.page - 1) * req.query.limit)
+	const limit = parseInt(req.query.limit)
+	if (!email) {
+		return res.sendError(400, 'email is required')
+	}
 	try {
-		const page = parseInt(req.query.page) || 1
-		const limit = parseInt(req.query.limit) || 10
-		const skip = (page - 1) * limit
-		const posts = await getHotPosts(skip, limit)
+		const posts = await getHotPosts(email, skip, limit)
 		const total = await Post.countDocuments()
-		res.sendSuccess({ posts, total, currentPage: page })
+		res.sendSuccess({ message: 'Posts fetched successfully', posts, total })
 	} catch (error) {
-		console.error('Error fetching hot posts:', error)
-		res.status(500).json({ error: '获取热门帖子时发生错误' })
+		console.error('Error in getPosts:', error)
+		res.sendError(500, 'Internal server error')
 	}
 }
 
@@ -198,11 +252,73 @@ const publishScheduledPosts = async () => {
 
 schedule.scheduleJob('* * * * *', publishScheduledPosts)
 
+const praisePost = async (req, res) => {
+	const { email, postId } = req.body
+	if (!email || !postId) {
+		return res.sendError(400, 'email or postId is required')
+	}
+	try {
+		const praise = await Praise.findOne({ email, postId })
+		const post = await Post.findOne({ postId })
+		if (praise) {
+			await Praise.deleteOne({ email, postId })
+			post.praiseNum--
+			await post.save()
+			return res.sendSuccess({ message: 'Praise canceled successfully' })
+		} else {
+			const praise = new Praise({
+				email,
+				postId,
+				praiseDate: Date.now()
+			})
+			post.praiseNum++
+			await praise.save()
+			await post.save()
+			return res.sendSuccess({ message: 'Praise successfully' })
+		}
+	} catch (error) {
+		console.error('Error in praisePost:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const collectPost = async (req, res) => {
+	const { email, postId } = req.body
+	if (!email || !postId) {
+		return res.sendError(400, 'email or postId is required')
+	}
+	try {
+		const collect = await Collect.findOne({ email, postId })
+		const post = await Post.findOne({ postId })
+		if (collect) {
+			await Collect.deleteOne({ email, postId })
+			post.collectNum--
+			await post.save()
+			return res.sendSuccess({ message: 'Collect canceled successfully' })
+		} else {
+			const collect = new Collect({
+				email,
+				postId,
+				praiseDate: Date.now()
+			})
+			post.collectNum++
+			await collect.save()
+			await post.save()
+			return res.sendSuccess({ message: 'Collect successfully' })
+		}
+	} catch (error) {
+		console.error('Error in collectPost:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	uploadCover,
 	publishPost,
 	saveToDraft,
 	getDraft,
 	publishScheduledPost,
-	getPosts
+	getPosts,
+	praisePost,
+	collectPost
 }
