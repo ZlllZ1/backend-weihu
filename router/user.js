@@ -27,4 +27,6 @@ router.post('/changeHomeBg', upload.single('homeBg'), userHandler.changeHomeBg)
 
 router.post('/changeCircleBg', upload.single('circleBg'), userHandler.changeCircleBg)
 
+router.post('/followUser', userHandler.followUser)
+
 module.exports = router

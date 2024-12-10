@@ -2,14 +2,14 @@ const { mongoose } = require('./index.js')
 const Schema = mongoose.Schema
 
 const fanSchema = new Schema({
-	fanUserId: String,
-	followedUserId: String,
+	fanEmail: String,
+	followedEmail: String,
 	fanDate: { type: Date, default: Date.now }
 })
 
 const friendSchema = new Schema({
-	userId1: String,
-	userId2: String,
+	email1: String,
+	email2: String,
 	friendDate: { type: Date, default: Date.now }
 })
 

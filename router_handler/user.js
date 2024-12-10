@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt')
 const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const path = require('path')
+const { Fan, Friend } = require('../mongodb/fan.js')
 
 const getUserInfo = async (req, res) => {
 	const { account } = req.query
@@ -222,6 +223,94 @@ const changeCircleBg = async (req, res) => {
 	}
 }
 
+const followUser = async (req, res) => {
+	const { fanEmail, followedEmail } = req.body
+	if (!fanEmail || !followedEmail)
+		return res.sendError(400, 'fanEmail or followedEmail is required')
+	try {
+		const [fan, followedUser] = await Promise.all([
+			User.findOne({ email: fanEmail }),
+			User.findOne({ email: followedEmail })
+		])
+		if (!fan) return res.sendError(404, 'Fan user not found')
+		if (!followedUser) return res.sendError(404, 'Followed user not found')
+		const existingFan = await Fan.findOne({ fanEmail, followedEmail })
+		let action
+		if (existingFan) {
+			const deletedFan = await Fan.findOneAndDelete({ fanEmail, followedEmail })
+			if (!deletedFan) return res.sendError(409, 'Fan relationship has been modified')
+			const [updatedFan, updatedFollowed] = await Promise.all([
+				User.findOneAndUpdate(
+					{ email: fanEmail, version: fan.version },
+					{ $inc: { followNum: -1, version: 1 } },
+					{ new: true }
+				),
+				User.findOneAndUpdate(
+					{ email: followedEmail, version: followedUser.version },
+					{ $inc: { fanNum: -1, version: 1 } },
+					{ new: true }
+				)
+			])
+			if (!updatedFan || !updatedFollowed) {
+				if (deletedFan) await Fan.create(deletedFan)
+				return res.sendError(409, 'User data has been modified')
+			}
+			action = 'unFollowed'
+			await Friend.deleteOne({
+				$or: [
+					{ email1: fanEmail, email2: followedEmail },
+					{ email1: followedEmail, email2: fanEmail }
+				]
+			})
+		} else {
+			const newFan = await Fan.create({ fanEmail, followedEmail, fanDate: Date.now() })
+			if (!newFan) return res.sendError(409, 'Fan relationship already exists')
+			const [updatedFan, updatedFollowed] = await Promise.all([
+				User.findOneAndUpdate(
+					{ email: fanEmail, version: fan.version },
+					{ $inc: { followNum: 1, version: 1 } },
+					{ new: true }
+				),
+				User.findOneAndUpdate(
+					{ email: followedEmail, version: followedUser.version },
+					{ $inc: { fanNum: 1, version: 1 } },
+					{ new: true }
+				)
+			])
+			if (!updatedFan || !updatedFollowed) {
+				await Fan.deleteOne({ fanEmail: newFan.email })
+				return res.sendError(409, 'User data has been modified')
+			}
+			action = 'followed'
+			const mutualFan = await Fan.findOne({
+				fanEmail: followedEmail,
+				fanEmail: followedEmail
+			})
+			if (mutualFan) {
+				await Friend.create({
+					email1: fanEmail,
+					email2: followedEmail
+				})
+				const [updatedFan, updatedFollowed] = await Promise.all([
+					User.findOneAndUpdate({ email: fanEmail }, { $inc: { friendNum: 1 } }, { new: true }),
+					User.findOneAndUpdate({ email: followedEmail }, { $inc: { friendNum: 1 } }, { new: true })
+				])
+				if (!updatedFan || !updatedFollowed) {
+					await Friend.deleteOne({ email1: fanEmail, email2: followedEmail })
+					throw new Error('Failed to update friendNum')
+				}
+			}
+		}
+		res.sendSuccess({ message: `Successfully ${action} user` })
+	} catch (error) {
+		await Fan.deleteOne({ fanEmail, followedEmail })
+		await User.findOneAndUpdate({ email: fanEmail }, { $inc: { followNum: -1 } })
+		await User.findOneAndUpdate({ email: followedEmail }, { $inc: { fanNum: -1 } })
+		console.error('Error in followUser:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	getUserInfo,
 	changeNickname,
@@ -233,5 +322,6 @@ module.exports = {
 	changeAvatar,
 	changeHomeBg,
 	changeCircleBg,
-	changeLive
+	changeLive,
+	followUser
 }

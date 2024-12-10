@@ -9,6 +9,7 @@ const Draft = require('../mongodb/draft.js')
 const ScheduledPost = require('../mongodb/scheduledPost.js')
 const Praise = require('../mongodb/praise.js')
 const Collect = require('../mongodb/collect.js')
+const { Fan, Friend } = require('../mongodb/fan.js')
 
 const uploadCover = async (req, res) => {
 	try {
@@ -34,6 +35,7 @@ const publishPost = async (req, res) => {
 	}
 	try {
 		const user = await User.findOne({ email })
+		if (!user) return res.sendError(404, 'User not found')
 		const commitUser = {
 			email: user.email,
 			nickname: user.nickname,
@@ -48,13 +50,20 @@ const publishPost = async (req, res) => {
 			content,
 			introduction,
 			delta,
-			publishData: Date.now,
+			publishDate: Date.now(),
 			user: commitUser
 		}
-		if (type === 'draft') {
-			await Draft.deleteMany({ email })
-		}
+		if (type === 'draft') await Draft.deleteMany({ email })
 		const post = await createPost(postData)
+		const updatedUser = await User.findOneAndUpdate(
+			{ email },
+			{ $inc: { postNum: 1 } },
+			{ new: true }
+		)
+		if (!updatedUser) {
+			await Post.deleteOne({ email })
+			return res.sendError(409, 'User data has been modified')
+		}
 		res.sendSuccess({ message: 'Post published successfully', postId: post.postId })
 	} catch (error) {
 		console.error('Error in publishPost:', error)
@@ -116,8 +125,8 @@ const getHotPosts = async (email, skip = 0, limit = 10) => {
 }
 
 const getPosts = async (req, res) => {
-	const { email } = req.query
-	const skip = parseInt((req.query.page - 1) * req.query.limit)
+	const { email, page } = req.query
+	const skip = parseInt((page - 1) * req.query.limit)
 	const limit = parseInt(req.query.limit)
 	if (!email) {
 		return res.sendError(400, 'email is required')
@@ -133,9 +142,9 @@ const getPosts = async (req, res) => {
 }
 
 const getPostInfo = async (req, res) => {
-	const { postId } = req.query
-	if (!postId) {
-		return res.sendError(400, 'postId is required')
+	const { postId, email } = req.query
+	if (!postId || !email) {
+		return res.sendError(400, 'postId or email is required')
 	}
 	try {
 		const post = await Post.findOne({ postId })
@@ -143,6 +152,11 @@ const getPostInfo = async (req, res) => {
 			return res.sendError(404, 'Post not found')
 		}
 		const user = await User.findOne({ email: post.email })
+		post.lookNum += 1
+		await post.save()
+		let isFollowing = false
+		const fanRelation = await Fan.findOne({ fanEmail: email, followedEmail: user.email })
+		isFollowing = !!fanRelation
 		res.sendSuccess({
 			message: 'Post fetched successfully',
 			post,
@@ -151,7 +165,8 @@ const getPostInfo = async (req, res) => {
 				nickname: user.nickname,
 				live: user.live,
 				avatar: user.avatar,
-				introduction: user.introduction
+				introduction: user.introduction,
+				isFollowing
 			}
 		})
 	} catch (error) {
@@ -340,6 +355,21 @@ const collectPost = async (req, res) => {
 	}
 }
 
+const getPublishedPost = async (req, res) => {
+	const { email } = req.query
+	if (!email) {
+		return res.sendError(400, 'email is required')
+	}
+	try {
+		const posts = await Post.find({ email })
+		const total = await Post.countDocuments({ email })
+		res.sendSuccess({ message: 'Posts fetched successfully', posts, total })
+	} catch (error) {
+		console.error('Error in getPublishedPost:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	uploadCover,
 	publishPost,
@@ -349,5 +379,6 @@ module.exports = {
 	getPosts,
 	praisePost,
 	collectPost,
-	getPostInfo
+	getPostInfo,
+	getPublishedPost
 }
