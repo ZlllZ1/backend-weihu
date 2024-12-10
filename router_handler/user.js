@@ -239,15 +239,37 @@ const followUser = async (req, res) => {
 		if (existingFan) {
 			const deletedFan = await Fan.findOneAndDelete({ fanEmail, followedEmail })
 			if (!deletedFan) return res.sendError(409, 'Fan relationship has been modified')
+			const isFriend = await Friend.findOne({
+				$or: [
+					{ email1: fanEmail, email2: followedEmail },
+					{ email1: followedEmail, email2: fanEmail }
+				]
+			})
+			let updateFanOp = { $inc: { followNum: -1, version: 1 } }
+			let updateFollowedOp = { $inc: { fanNum: -1, version: 1 } }
+			// const updateOperations = [
+			// 	User.findOneAndUpdate(
+			// 		{ email: fanEmail, version: fan.version },
+			// 		{ $inc: { followNum: -1, version: 1 } },
+			// 		{ new: true }
+			// 	),
+			// 	User.findOneAndUpdate(
+			// 		{ email: followedEmail, version: followedUser.version },
+			// 		{ $inc: { fanNum: -1, version: 1 } },
+			// 		{ new: true }
+			// 	)
+			// ]
+			if (isFriend) {
+				updateFanOp.$inc.friendNum = -1
+				updateFollowedOp.$inc.friendNum = -1
+			}
 			const [updatedFan, updatedFollowed] = await Promise.all([
-				User.findOneAndUpdate(
-					{ email: fanEmail, version: fan.version },
-					{ $inc: { followNum: -1, version: 1 } },
-					{ new: true }
-				),
+				User.findOneAndUpdate({ email: fanEmail, version: fan.version }, updateFanOp, {
+					new: true
+				}),
 				User.findOneAndUpdate(
 					{ email: followedEmail, version: followedUser.version },
-					{ $inc: { fanNum: -1, version: 1 } },
+					updateFollowedOp,
 					{ new: true }
 				)
 			])
