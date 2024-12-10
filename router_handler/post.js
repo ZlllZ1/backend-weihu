@@ -109,7 +109,7 @@ const getHotPosts = async (email, skip = 0, limit = 10) => {
 			...post,
 			praise: praise[index],
 			collect: collect[index],
-			user: user[index]
+			user: user[index][0]
 		}
 	})
 	return res
@@ -128,6 +128,34 @@ const getPosts = async (req, res) => {
 		res.sendSuccess({ message: 'Posts fetched successfully', posts, total })
 	} catch (error) {
 		console.error('Error in getPosts:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const getPostInfo = async (req, res) => {
+	const { postId } = req.query
+	if (!postId) {
+		return res.sendError(400, 'postId is required')
+	}
+	try {
+		const post = await Post.findOne({ postId })
+		if (!post) {
+			return res.sendError(404, 'Post not found')
+		}
+		const user = await User.findOne({ email: post.email })
+		res.sendSuccess({
+			message: 'Post fetched successfully',
+			post,
+			user: {
+				email: user.email,
+				nickname: user.nickname,
+				live: user.live,
+				avatar: user.avatar,
+				introduction: user.introduction
+			}
+		})
+	} catch (error) {
+		console.error('Error in getPostInfo:', error)
 		res.sendError(500, 'Internal server error')
 	}
 }
@@ -320,5 +348,6 @@ module.exports = {
 	publishScheduledPost,
 	getPosts,
 	praisePost,
-	collectPost
+	collectPost,
+	getPostInfo
 }

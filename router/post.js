@@ -20,4 +20,6 @@ router.post('/praisePost', postHandler.praisePost)
 
 router.post('/collectPost', postHandler.collectPost)
 
+router.get('/getPostInfo', postHandler.getPostInfo)
+
 module.exports = router
