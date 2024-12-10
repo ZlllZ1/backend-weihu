@@ -287,26 +287,33 @@ schedule.scheduleJob('* * * * *', publishScheduledPosts)
 
 const praisePost = async (req, res) => {
 	const { email, postId } = req.body
-	if (!email || !postId) {
-		return res.sendError(400, 'email or postId is required')
-	}
+	if (!email || !postId) return res.sendError(400, 'email or postId is required')
 	try {
-		const praise = await Praise.findOne({ email, postId })
 		const post = await Post.findOne({ postId })
+		if (!post) return res.sendError(404, 'Post not found')
+		const user = await User.findOne({ email })
+		if (!user) {
+			return res.sendError(404, 'User not found')
+		}
+		const praise = await Praise.findOne({ email, postId })
 		if (praise) {
-			await Praise.deleteOne({ email, postId })
-			post.praiseNum--
-			await post.save()
+			await Promise.all([
+				Praise.deleteOne({ email, postId }),
+				Post.updateOne({ postId: post.postId }, { $inc: { praiseNum: -1 } }),
+				User.updateOne({ email: user.email }, { $inc: { praiseNum: -1 } })
+			])
 			return res.sendSuccess({ message: 'Praise canceled successfully' })
 		} else {
-			const praise = new Praise({
+			const newPraise = new Praise({
 				email,
 				postId,
 				praiseDate: Date.now()
 			})
-			post.praiseNum++
-			await praise.save()
-			await post.save()
+			await Promise.all([
+				newPraise.save(),
+				Post.updateOne({ postId: post.postId }, { $inc: { praiseNum: 1 } }),
+				User.updateOne({ email: user.email }, { $inc: { praiseNum: 1 } })
+			])
 			return res.sendSuccess({ message: 'Praise successfully' })
 		}
 	} catch (error) {
@@ -317,26 +324,31 @@ const praisePost = async (req, res) => {
 
 const collectPost = async (req, res) => {
 	const { email, postId } = req.body
-	if (!email || !postId) {
-		return res.sendError(400, 'email or postId is required')
-	}
+	if (!email || !postId) return res.sendError(400, 'email or postId is required')
 	try {
-		const collect = await Collect.findOne({ email, postId })
 		const post = await Post.findOne({ postId })
+		if (!post) return res.sendError(404, 'Post not found')
+		const user = await User.findOne({ email })
+		if (!user) return res.sendError(404, 'User not found')
+		const collect = await Collect.findOne({ email, postId })
 		if (collect) {
-			await Collect.deleteOne({ email, postId })
-			post.collectNum--
-			await post.save()
+			await Promise.all([
+				Collect.deleteOne({ email, postId }),
+				Post.updateOne({ postId: post.postId }, { $inc: { collectNum: -1 } }),
+				User.updateOne({ email: user.email }, { $inc: { collectNum: -1 } })
+			])
 			return res.sendSuccess({ message: 'Collect canceled successfully' })
 		} else {
-			const collect = new Collect({
+			const newCollect = new Collect({
 				email,
 				postId,
-				praiseDate: Date.now()
+				collectDate: Date.now()
 			})
-			post.collectNum++
-			await collect.save()
-			await post.save()
+			await Promise.all([
+				newCollect.save(),
+				Post.updateOne({ postId: post.postId }, { $inc: { collectNum: 1 } }),
+				User.updateOne({ email: user.email }, { $inc: { collectNum: 1 } })
+			])
 			return res.sendSuccess({ message: 'Collect successfully' })
 		}
 	} catch (error) {

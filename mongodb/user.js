@@ -21,8 +21,10 @@ const userSchema = new Schema({
 	followNum: { type: Number, default: 0 },
 	fanNum: { type: Number, default: 0 },
 	postNum: { type: Number, default: 0 },
+	praiseNum: { type: Number, default: 0 },
 	friendNum: { type: Number, default: 0 },
 	circleNum: { type: Number, default: 0 },
+	collectNum: { type: Number, default: 0 },
 	registrationDate: { type: Date, default: Date.now },
 	lastLoginDate: { type: Date, default: Date.now },
 	setting: { type: mongoose.Schema.Types.ObjectId, ref: 'Setting' }
