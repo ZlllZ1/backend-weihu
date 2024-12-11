@@ -374,6 +374,46 @@ const getPublishedPost = async (req, res) => {
 	}
 }
 
+const getOnesPosts = async (req, res) => {
+	const { email } = req.query
+	if (!email) return res.sendError(400, 'email is required')
+	try {
+		const posts = await Post.find({ email })
+		const total = await Post.countDocuments({ email })
+		const postIds = posts.map(post => post.postId)
+		const [praises, collects] = await Promise.all([
+			Praise.find({ email, postId: { $in: postIds } }).lean(),
+			Collect.find({ email, postId: { $in: postIds } }).lean()
+		])
+		const praiseSet = new Set(praises.map(p => p.postId.toString()))
+		const collectSet = new Set(collects.map(c => c.postId.toString()))
+		const postsWithStatus = posts.map(post => ({
+			...post.toObject(),
+			isPraised: praiseSet.has(post.postId.toString()),
+			isCollected: collectSet.has(post.postId.toString())
+		}))
+		res.sendSuccess({ message: 'Posts fetched successfully', posts: postsWithStatus, total })
+	} catch (error) {
+		console.error('Error in getOnesPosts:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const updateShareNum = async (req, res) => {
+	const { postId } = req.body
+	if (!postId) return res.sendError(400, 'postId is required')
+	try {
+		const post = await Post.findOne({ postId })
+		if (!post) return res.sendError(404, 'Post not found')
+		const shareNum = post.shareNum + 1
+		await Post.updateOne({ postId: post.postId }, { $set: { shareNum } })
+		return res.sendSuccess({ message: 'Share successfully' })
+	} catch (error) {
+		console.error('Error in updateShareNum:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	uploadCover,
 	publishPost,
@@ -384,5 +424,7 @@ module.exports = {
 	praisePost,
 	collectPost,
 	getPostInfo,
-	getPublishedPost
+	getPublishedPost,
+	getOnesPosts,
+	updateShareNum
 }

@@ -24,4 +24,8 @@ router.get('/getPostInfo', postHandler.getPostInfo)
 
 router.get('/getPublishedPost', postHandler.getPublishedPost)
 
+router.get('/getOnesPosts', postHandler.getOnesPosts)
+
+router.post('/updateShareNum', postHandler.updateShareNum)
+
 module.exports = router
