@@ -19,7 +19,7 @@ const calcRate = async () => {
 }
 
 const scheduleCalc = () => {
-	schedule.scheduleJob('1 * * * *', calcRate)
+	schedule.scheduleJob('0 0 * * *', calcRate)
 }
 
 scheduleCalc()

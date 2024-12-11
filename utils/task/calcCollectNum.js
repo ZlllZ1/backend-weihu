@@ -1,22 +1,23 @@
 const schedule = require('node-schedule')
-const { Post } = require('../../mongodb/post.js')
+const User = require('../../mongodb/user.js')
 const Collect = require('../../mongodb/collect.js')
 
 const syncCollectCount = async () => {
-	const posts = await Post.find(
-		{},
-		{
-			_id: 0,
-			postId: 1
+	try {
+		const users = await User.find({}, { email: 1, _id: 0 })
+		const bulkOps = []
+		for (const user of users) {
+			const collectCount = await Collect.countDocuments({ email: user.email })
+			bulkOps.push({
+				updateOne: {
+					filter: { email: user.email },
+					update: { $set: { collectNum: collectCount } }
+				}
+			})
 		}
-	)
-	for (let post of posts) {
-		const collectNum = await Collect.countDocuments({ postId: post.postId })
-		await Post.findOneAndUpdate(
-			{ postId: post.postId },
-			{ $set: { collectNum: collectNum } },
-			{ new: true }
-		)
+		if (bulkOps.length > 0) await User.bulkWrite(bulkOps)
+	} catch (error) {
+		console.error('同步收藏数量时出错:', error)
 	}
 }
 

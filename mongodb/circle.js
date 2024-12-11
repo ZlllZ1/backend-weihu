@@ -1,9 +1,9 @@
 const { mongoose } = require('./index.js')
 const Schema = mongoose.Schema
 
-const momentSchema = new Schema({
-	momentId: String,
-	userId: String,
+const circleSchema = new Schema({
+	circleId: String,
+	email: String,
 	publishDate: { type: Date, default: Date.now },
 	area: String,
 	content: String,
@@ -11,6 +11,6 @@ const momentSchema = new Schema({
 	commentNum: Number
 })
 
-const Moment = mongoose.model('Moment', momentSchema)
+const Circle = mongoose.model('Circle', circleSchema)
 
-module.exports = Moment
+module.exports = Circle
