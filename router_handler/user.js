@@ -321,6 +321,65 @@ const followUser = async (req, res) => {
 	}
 }
 
+const getOnesInfo = async (req, res) => {
+	const { email, type } = req.query
+	if (!email) return res.sendError(400, 'email is required')
+	if (!['fan', 'follow', 'friend'].includes(type))
+		return res.sendError(400, 'type must be one of [fan, follow, friend]')
+	try {
+		let relatedEmails = []
+		let users = []
+		switch (type) {
+			case 'fan':
+				const fans = await Fan.find({ followedEmail: email }).lean()
+				relatedEmails = fans.map(fan => fan.fanEmail)
+				break
+			case 'follow':
+				const follows = await User.find({ fanEmail: email }).lean()
+				relatedEmails = follows.map(follow => follow.followedEmail)
+				break
+			case 'friend':
+				const friends = await Friend.find({
+					$or: [{ email1: email }, { email2: email }]
+				}).lean()
+				relatedEmails = friends.map(friend =>
+					friend.email1 === email ? friend.email2 : friend.email1
+				)
+				break
+		}
+		if (relatedEmails.length > 0) {
+			users = await User.find(
+				{ email: { $in: relatedEmails } },
+				{
+					email: 1,
+					nickname: 1,
+					avatar: 1,
+					_id: 0,
+					introduction: 1,
+					token: 1,
+					lastLoginDate: 1,
+					sex: 1
+				}
+			).lean()
+			const currentUserFollows = await Fan.find({ fanEmail: email }).lean()
+			const followedEmails = new Set(currentUserFollows.map(f => f.followedEmail))
+			users = users.map(user => ({
+				...user,
+				isFollowing: followedEmails.has(user.email)
+			}))
+		}
+		const total = users.length
+		res.sendSuccess({
+			message: `${type} info fetched successfully`,
+			users,
+			total
+		})
+	} catch (error) {
+		console.error('Error in getOnesInfo:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	getUserInfo,
 	changeNickname,
@@ -333,5 +392,6 @@ module.exports = {
 	changeHomeBg,
 	changeCircleBg,
 	changeLive,
-	followUser
+	followUser,
+	getOnesInfo
 }
