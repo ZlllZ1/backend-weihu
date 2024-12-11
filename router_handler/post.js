@@ -117,16 +117,53 @@ const getHotPosts = async (email, skip = 0, limit = 10) => {
 }
 
 const getPosts = async (req, res) => {
-	const { email, page } = req.query
-	const skip = parseInt((page - 1) * req.query.limit)
-	const limit = parseInt(req.query.limit)
-	if (!email) {
-		return res.sendError(400, 'email is required')
-	}
+	const { email, page, type, limit } = req.query
+	const skip = parseInt((page - 1) * limit)
+	const limitNum = parseInt(limit)
+	if (!email) return res.sendError(400, 'email is required')
 	try {
-		const posts = await getHotPosts(email, skip, limit)
-		const total = await Post.countDocuments()
-		res.sendSuccess({ message: 'Posts fetched successfully', posts, total })
+		let posts, total
+		switch (type) {
+			case 'recommend':
+				posts = await getHotPosts(email, skip, limitNum)
+				total = await Post.countDocuments()
+				break
+			case 'follow':
+				const follows = await Fan.find({ fanEmail: email }).lean()
+				const followedEmails = follows.map(f => f.followedEmail)
+				posts = await Post.find({ email: { $in: followedEmails } })
+					.sort({ publishDate: -1 })
+					.skip(skip)
+					.limit(limitNum)
+					.lean()
+				total = await Post.countDocuments({ email: { $in: followedEmails } })
+				break
+			case 'friend':
+				const friends = await Friend.find({ $or: [{ email1: email }, { email2: email }] })
+				const friendEmails = friends.map(f => (f.email1 === email ? f.email2 : f.email1))
+				posts = await Post.find({ email: { $in: friendEmails } })
+					.sort({ publishDate: -1 })
+					.skip(skip)
+					.limit(limitNum)
+					.lean()
+				total = await Post.countDocuments({ email: { $in: friendEmails } })
+				break
+			default:
+				return res.sendError(400, 'Invalid type')
+		}
+		const postIds = posts.map(post => post.postId)
+		const [praises, collects] = await Promise.all([
+			Praise.find({ email, postId: { $in: postIds } }).lean(),
+			Collect.find({ email, postId: { $in: postIds } }).lean()
+		])
+		const praiseSet = new Set(praises.map(p => p.postId.toString()))
+		const collectSet = new Set(collects.map(c => c.postId.toString()))
+		const postsWithStatus = posts.map(post => ({
+			...post,
+			praise: praiseSet.has(post.postId.toString()),
+			collect: collectSet.has(post.postId.toString())
+		}))
+		res.sendSuccess({ message: 'Posts fetched successfully', posts: postsWithStatus, total })
 	} catch (error) {
 		console.error('Error in getPosts:', error)
 		res.sendError(500, 'Internal server error')
@@ -379,7 +416,7 @@ const getOnesPosts = async (req, res) => {
 	if (!email) return res.sendError(400, 'email is required')
 	try {
 		let posts, total
-		const query = { email }
+		const query = {}
 		if (type === 'praise') {
 			const praises = await Praise.find({ email })
 			const praisedPostIds = praises.map(p => p.postId)

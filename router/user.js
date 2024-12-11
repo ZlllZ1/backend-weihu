@@ -31,4 +31,6 @@ router.post('/followUser', userHandler.followUser)
 
 router.get('/getOnesInfo', userHandler.getOnesInfo)
 
+router.get('/getOtherUserInfo', userHandler.getOtherUserInfo)
+
 module.exports = router

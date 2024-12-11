@@ -380,6 +380,51 @@ const getOnesInfo = async (req, res) => {
 	}
 }
 
+const getOtherUserInfo = async (req, res) => {
+	const { email, visitEmail } = req.query
+	if (!email || !visitEmail) return res.sendError(400, 'email or visitEmail is required')
+	try {
+		const user = await User.findOne({ email: visitEmail }).populate('setting').lean()
+		if (!user) return res.sendError(404, 'User not found')
+		const { setting } = user
+		const result = {
+			email: user.email,
+			nickname: user.nickname,
+			birthDate: user.birthDate,
+			sex: user.sex,
+			age: user.age,
+			live: user.live,
+			introduction: user.introduction,
+			avatar: user.avatar,
+			homeBg: user.homeBg,
+			postNum: user.postNum
+		}
+		if (setting.showFollow) result.followNum = user.followNum
+		if (setting.showFan) result.fanNum = user.fanNum
+		if (setting.showCollect) result.collectNum = user.collectNum
+		if (setting.showPraise) result.praiseNum = user.praiseNum
+		if (setting.showIp) result.ipAddress = user.ipAddress
+		const isFollowing = await Fan.findOne({
+			fanEmail: visitEmail,
+			followedEmail: email
+		})
+		if (isFollowing) result.isFollowing = true
+		const isFriend = await Friend.findOne({
+			$or: [
+				{ email1: email, email2: visitEmail },
+				{ email1: visitEmail, email2: email }
+			]
+		})
+		if (isFriend) {
+			result.circleNum = user.circleNum
+		}
+		res.sendSuccess(result)
+	} catch (error) {
+		console.error('Error in getOtherUserInfo:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	getUserInfo,
 	changeNickname,
@@ -393,5 +438,6 @@ module.exports = {
 	changeCircleBg,
 	changeLive,
 	followUser,
-	getOnesInfo
+	getOnesInfo,
+	getOtherUserInfo
 }
