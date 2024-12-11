@@ -120,6 +120,10 @@ const logout = async (req, res) => {
 		const result = await User.updateOne({ email: account }, { $set: { token: null } })
 		if (result.matchedCount === 0) return res.sendError(404, 'User not found')
 		if (result.modifiedCount === 0) return res.sendSuccess({ message: 'User already logged out' })
+		const user = await User.findOne({ email: account })
+		if (!user) return res.sendError(404, 'User not found')
+		user.lastLoginDate = new Date()
+		await user.save()
 		return res.sendSuccess({ message: 'Logout successful' })
 	} catch (error) {
 		console.error('Error in logout:', error)

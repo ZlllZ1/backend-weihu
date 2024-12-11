@@ -335,7 +335,7 @@ const getOnesInfo = async (req, res) => {
 				relatedEmails = fans.map(fan => fan.fanEmail)
 				break
 			case 'follow':
-				const follows = await User.find({ fanEmail: email }).lean()
+				const follows = await Fan.find({ fanEmail: email }).lean()
 				relatedEmails = follows.map(follow => follow.followedEmail)
 				break
 			case 'friend':
