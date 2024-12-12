@@ -129,9 +129,9 @@ const passwordLogin = async (req, res) => {
 }
 
 const refreshToken = async (req, res) => {
+	const { refreshToken } = req.body
+	if (!refreshToken) return res.sendError(400, 'refreshToken is required')
 	try {
-		const { refreshToken } = req.body
-		if (!refreshToken) return res.sendError(400, 'refreshToken is required')
 		jwt.verify(refreshToken, process.env.JWT_SECRET, async (err, decoded) => {
 			if (err) return res.sendError(401, 'Invalid refresh token')
 			const user = await User.findOne({ email: decoded.email })
@@ -162,6 +162,7 @@ const logout = async (req, res) => {
 		const user = await User.findOne({ email: account })
 		if (!user) return res.sendError(404, 'User not found')
 		user.lastLoginDate = new Date()
+		user.refreshToken = null
 		await user.save()
 		return res.sendSuccess({ message: 'Logout successful' })
 	} catch (error) {

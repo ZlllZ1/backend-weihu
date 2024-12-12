@@ -29,12 +29,11 @@ const uploadCover = async (req, res) => {
 
 const publishPost = async (req, res) => {
 	const { email, title, coverUrl, content, introduction, delta, type } = req.body
-	if (!email || !title || !coverUrl || !content || !introduction || !delta) {
+	if (!email || !title || !coverUrl || !content || !introduction || !delta)
 		return res.sendError(
 			400,
 			'email, title or coverUrl or content or introduction or delta is required'
 		)
-	}
 	try {
 		const user = await User.findOne({ email })
 		if (!user) return res.sendError(404, 'User not found')
@@ -172,23 +171,25 @@ const getPosts = async (req, res) => {
 
 const getPostInfo = async (req, res) => {
 	const { postId, email } = req.query
-	if (!postId || !email) {
-		return res.sendError(400, 'postId or email is required')
-	}
+	if (!postId || !email) return res.sendError(400, 'postId or email is required')
 	try {
 		const post = await Post.findOne({ postId })
-		if (!post) {
-			return res.sendError(404, 'Post not found')
-		}
+		if (!post) return res.sendError(404, 'Post not found')
 		const user = await User.findOne({ email: post.email })
 		post.lookNum += 1
 		await post.save()
 		let isFollowing = false
 		const fanRelation = await Fan.findOne({ fanEmail: email, followedEmail: user.email })
 		isFollowing = !!fanRelation
+		const isPraise = await Praise.exists({ email, postId })
+		const isCollect = await Collect.exists({ email, postId })
 		res.sendSuccess({
 			message: 'Post fetched successfully',
-			post,
+			post: {
+				...post.toObject(),
+				isPraise: !!isPraise,
+				isCollect: !!isCollect
+			},
 			user: {
 				email: user.email,
 				nickname: user.nickname,
@@ -206,14 +207,10 @@ const getPostInfo = async (req, res) => {
 
 const saveToDraft = async (req, res) => {
 	const { email, title, coverUrl, content, introduction, delta } = req.body
-	if (!email) {
-		return res.sendError(400, 'email is required')
-	}
+	if (!email) return res.sendError(400, 'email is required')
 	try {
 		const user = await User.findOne({ email })
-		if (!user) {
-			return res.sendError(404, 'User not found')
-		}
+		if (!user) return res.sendError(404, 'User not found')
 		const draft = new Draft({
 			email,
 			title,
@@ -234,9 +231,7 @@ const saveToDraft = async (req, res) => {
 
 const getDraft = async (req, res) => {
 	const { email } = req.query
-	if (!email) {
-		return res.sendError(400, 'email is required')
-	}
+	if (!email) return res.sendError(400, 'email is required')
 	try {
 		const draft = await Draft.findOne({ email })
 		res.sendSuccess({ message: 'Post saved to draft successfully', draft })
@@ -248,12 +243,11 @@ const getDraft = async (req, res) => {
 
 const publishScheduledPost = async (req, res) => {
 	const { email, title, coverUrl, content, introduction, delta, publishDate } = req.body
-	if (!email || !title || !coverUrl || !content || !introduction || !delta) {
+	if (!email || !title || !coverUrl || !content || !introduction || !delta)
 		return res.sendError(
 			400,
 			'email, title or coverUrl or content or introduction or delta is required'
 		)
-	}
 	try {
 		const user = await User.findOne({ email })
 		const commitUser = {
@@ -331,9 +325,7 @@ const praisePost = async (req, res) => {
 		const post = await Post.findOne({ postId })
 		if (!post) return res.sendError(404, 'Post not found')
 		const user = await User.findOne({ email })
-		if (!user) {
-			return res.sendError(404, 'User not found')
-		}
+		if (!user) return res.sendError(404, 'User not found')
 		const praise = await Praise.findOne({ email, postId })
 		if (praise) {
 			await Promise.all([
@@ -398,9 +390,7 @@ const collectPost = async (req, res) => {
 
 const getPublishedPost = async (req, res) => {
 	const { email } = req.query
-	if (!email) {
-		return res.sendError(400, 'email is required')
-	}
+	if (!email) return res.sendError(400, 'email is required')
 	try {
 		const posts = await Post.find({ email })
 		const total = await Post.countDocuments({ email })
