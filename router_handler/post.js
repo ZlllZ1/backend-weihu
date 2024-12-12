@@ -74,9 +74,9 @@ const publishPost = async (req, res) => {
 
 const getHotPosts = async (email, skip = 0, limit = 10) => {
 	const posts = await Post.aggregate([
+		{ $sort: { rate: -1, publishDate: -1 } },
 		{ $skip: skip },
 		{ $limit: limit },
-		{ $sort: { rate: -1 } },
 		{
 			$project: {
 				_id: 0,
@@ -116,39 +116,40 @@ const getHotPosts = async (email, skip = 0, limit = 10) => {
 }
 
 const getPosts = async (req, res) => {
-	const { email, page, type, limit } = req.query
-	const skip = parseInt((page - 1) * limit)
-	const limitNum = parseInt(limit)
+	const { email, type } = req.query
+	const limit = parseInt(req.query.limit)
+	const page = parseInt(req.query.page)
+	const skip = (page - 1) * limit
 	if (!email) return res.sendError(400, 'email is required')
 	try {
-		let posts, total
+		let posts,
+			total,
+			query = {}
 		switch (type) {
 			case 'recommend':
-				posts = await getHotPosts(email, skip, limitNum)
+				posts = await getHotPosts(email, skip, limit)
 				total = await Post.countDocuments()
 				break
 			case 'follow':
 				const follows = await Fan.find({ fanEmail: email }).lean()
 				const followedEmails = follows.map(f => f.followedEmail)
-				posts = await Post.find({ email: { $in: followedEmails } })
-					.sort({ publishDate: -1 })
-					.skip(skip)
-					.limit(limitNum)
-					.lean()
-				total = await Post.countDocuments({ email: { $in: followedEmails } })
+				query = { email: { $in: followedEmails } }
 				break
 			case 'friend':
 				const friends = await Friend.find({ $or: [{ email1: email }, { email2: email }] })
 				const friendEmails = friends.map(f => (f.email1 === email ? f.email2 : f.email1))
-				posts = await Post.find({ email: { $in: friendEmails } })
-					.sort({ publishDate: -1 })
-					.skip(skip)
-					.limit(limitNum)
-					.lean()
-				total = await Post.countDocuments({ email: { $in: friendEmails } })
+				query = { email: { $in: friendEmails } }
 				break
 			default:
 				return res.sendError(400, 'Invalid type')
+		}
+		if (type !== 'recommend') {
+			posts = await Post.find(query)
+				.sort({ publishDate: -1, rate: -1 })
+				.skip(skip)
+				.limit(limit)
+				.lean()
+			total = await Post.countDocuments(query)
 		}
 		const postIds = posts.map(post => post.postId)
 		const [praises, collects] = await Promise.all([
