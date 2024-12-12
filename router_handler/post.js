@@ -404,10 +404,12 @@ const getPublishedPost = async (req, res) => {
 
 const getOnesPosts = async (req, res) => {
 	const { email, type } = req.query
+	const limit = parseInt(req.query.limit)
+	const page = parseInt(req.query.page)
+	const skip = limit * (page - 1)
 	if (!email) return res.sendError(400, 'email is required')
 	try {
-		let posts, total
-		const query = {}
+		const query = { email }
 		if (type === 'praise') {
 			const praises = await Praise.find({ email })
 			const praisedPostIds = praises.map(p => p.postId)
@@ -417,8 +419,10 @@ const getOnesPosts = async (req, res) => {
 			const collectedPostIds = collects.map(c => c.postId)
 			query.postId = { $in: collectedPostIds }
 		}
-		posts = await Post.find(query).lean()
-		total = await Post.countDocuments(query)
+		const [posts, total] = await Promise.all([
+			Post.find(query).skip(skip).limit(limit).lean(),
+			Post.countDocuments(query)
+		])
 		const postIds = posts.map(post => post.postId)
 		const [praises, collects] = await Promise.all([
 			Praise.find({ email, postId: { $in: postIds } }).lean(),
@@ -431,7 +435,7 @@ const getOnesPosts = async (req, res) => {
 			praise: praiseSet.has(post.postId.toString()),
 			collect: collectSet.has(post.postId.toString())
 		}))
-		res.sendSuccess({ message: 'Posts fetched successfully', posts: postsWithStatus, total })
+		res.sendSuccess({ message: 'Posts fetched successfully', posts: postsWithStatus, total, page })
 	} catch (error) {
 		console.error('Error in getOnesPosts:', error)
 		res.sendError(500, 'Internal server error')

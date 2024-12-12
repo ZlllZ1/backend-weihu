@@ -323,12 +323,15 @@ const followUser = async (req, res) => {
 
 const getOnesInfo = async (req, res) => {
 	const { email, type } = req.query
+	const limit = parseInt(req.query.limit)
+	const page = parseInt(req.query.page)
+	const skip = (page - 1) * limit
 	if (!email) return res.sendError(400, 'email is required')
 	if (!['fan', 'follow', 'friend'].includes(type))
 		return res.sendError(400, 'type must be one of [fan, follow, friend]')
 	try {
 		let relatedEmails = []
-		let users = []
+		let query = []
 		switch (type) {
 			case 'fan':
 				const fans = await Fan.find({ followedEmail: email }).lean()
@@ -347,32 +350,34 @@ const getOnesInfo = async (req, res) => {
 				)
 				break
 		}
-		if (relatedEmails.length > 0) {
-			users = await User.find(
-				{ email: { $in: relatedEmails } },
-				{
-					email: 1,
-					nickname: 1,
-					avatar: 1,
-					_id: 0,
-					introduction: 1,
-					token: 1,
-					lastLoginDate: 1,
-					sex: 1
-				}
-			).lean()
-			const currentUserFollows = await Fan.find({ fanEmail: email }).lean()
-			const followedEmails = new Set(currentUserFollows.map(f => f.followedEmail))
-			users = users.map(user => ({
-				...user,
-				isFollowing: followedEmails.has(user.email)
-			}))
-		}
-		const total = users.length
+		if (relatedEmails.length > 0) query = { email: { $in: relatedEmails } }
+		const [users, total] = await Promise.all([
+			User.find(query, {
+				email: 1,
+				nickname: 1,
+				avatar: 1,
+				_id: 0,
+				introduction: 1,
+				token: 1,
+				lastLoginDate: 1,
+				sex: 1
+			})
+				.skip(skip)
+				.limit(limit)
+				.lean(),
+			User.countDocuments(query)
+		])
+		const currentUserFollows = await Fan.find({ fanEmail: email }).lean()
+		const followedEmails = new Set(currentUserFollows.map(f => f.followedEmail))
+		const usersWithFollowStatus = users.map(user => ({
+			...user,
+			isFollowing: followedEmails.has(user.email)
+		}))
 		res.sendSuccess({
 			message: `${type} info fetched successfully`,
-			users,
-			total
+			users: usersWithFollowStatus,
+			total,
+			page
 		})
 	} catch (error) {
 		console.error('Error in getOnesInfo:', error)
