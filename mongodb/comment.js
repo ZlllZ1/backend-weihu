@@ -6,7 +6,9 @@ const commentSchema = new Schema({
 	parentId: { type: String, default: null },
 	type: String,
 	commentedId: String,
-	userId: String,
+	postId: String,
+	circleId: String,
+	email: String,
 	content: String,
 	commentDate: { type: Date, default: Date.now }
 })
