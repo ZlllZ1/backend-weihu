@@ -409,7 +409,7 @@ const getOnesPosts = async (req, res) => {
 	const skip = limit * (page - 1)
 	if (!email) return res.sendError(400, 'email is required')
 	try {
-		const query = { email }
+		const query = {}
 		if (type === 'praise') {
 			const praises = await Praise.find({ email })
 			const praisedPostIds = praises.map(p => p.postId)
