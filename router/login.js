@@ -10,6 +10,8 @@ router.post('/codeLogin', loginHandler.codeLogin)
 
 router.post('/passwordLogin', loginHandler.passwordLogin)
 
+router.post('/refreshToken', loginHandler.refreshToken)
+
 router.post('/logout', loginHandler.logout)
 
 module.exports = router

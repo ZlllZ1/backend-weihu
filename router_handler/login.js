@@ -13,6 +13,17 @@ const generateToken = user => {
 			email: user.email
 		},
 		process.env.JWT_SECRET,
+		{ expiresIn: '15m' }
+	)
+}
+
+const generateRefreshToken = user => {
+	return jwt.sign(
+		{
+			id: user._id.toString(),
+			email: user.email
+		},
+		process.env.JWT_SECRET,
 		{ expiresIn: '1d' }
 	)
 }
@@ -85,9 +96,11 @@ const codeLogin = async (req, res) => {
 			})
 		user.lastLoginDate = new Date()
 		user.ipAddress = ipAddress
-		user.token = generateToken(user)
+		const token = generateToken(user)
+		const refreshToken = generateRefreshToken(user)
+		user.refreshToken = refreshToken
 		await Promise.all([user.save(), setting.save(), AuthCode.deleteMany({ email: account })])
-		return res.sendSuccess({ token: user.token }, 'Register/Login success')
+		return res.sendSuccess({ token, refreshToken }, 'Register/Login success')
 	} catch (error) {
 		console.error(error)
 		return res.sendError(500, 'Server error')
@@ -95,20 +108,46 @@ const codeLogin = async (req, res) => {
 }
 
 const passwordLogin = async (req, res) => {
+	const { account, password } = req.body
+	if (!account || !password) return res.sendError(400, 'account or password is required')
 	try {
-		const { account, password } = req.body
 		const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress
-		if (!account || !password) return res.sendError(400, 'account or password is required')
 		const user = await User.findOne({ email: account })
 		if (!user) return res.sendError(400, 'Invalid account')
 		const isValid = await bcrypt.compareSync(password, user.password)
 		if (!isValid) return res.sendError(400, 'Invalid password')
 		user.lastLoginDate = new Date()
 		user.ipAddress = ipAddress
-		user.token = generateToken(user)
+		const token = generateToken(user)
+		const refreshToken = generateRefreshToken(user)
+		user.refreshToken = refreshToken
 		await user.save()
-		return res.sendSuccess({ token: user.token }, 'Login success')
+		return res.sendSuccess({ token, refreshToken }, 'Login success')
 	} catch (error) {
+		return res.sendError(500, 'An error occurred during login')
+	}
+}
+
+const refreshToken = async (req, res) => {
+	try {
+		const { refreshToken } = req.body
+		if (!refreshToken) return res.sendError(400, 'refreshToken is required')
+		jwt.verify(refreshToken, process.env.JWT_SECRET, async (err, decoded) => {
+			if (err) return res.sendError(401, 'Invalid refresh token')
+			const user = await User.findOne({ email: decoded.email })
+			if (!user || user.refreshToken !== refreshToken)
+				return res.sendError(401, 'User not found or refresh token is invalid')
+			const newToken = generateToken(user)
+			const newRefreshToken = generateRefreshToken(user)
+			user.refreshToken = newRefreshToken
+			await user.save()
+			return res.sendSuccess(
+				{ token: newToken, refreshToken: newRefreshToken },
+				'Refresh token success'
+			)
+		})
+	} catch (error) {
+		console.error(error)
 		return res.sendError(500, 'An error occurred during login')
 	}
 }
@@ -136,5 +175,6 @@ module.exports = {
 	judgeAuthCode,
 	codeLogin,
 	passwordLogin,
-	logout
+	logout,
+	refreshToken
 }
