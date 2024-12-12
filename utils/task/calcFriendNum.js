@@ -1,42 +1,22 @@
 const schedule = require('node-schedule')
 const User = require('../../mongodb/user.js')
-const { Fan } = require('../../mongodb/fan.js')
+const { Friend } = require('../../mongodb/fan.js')
 
 const syncFriendCount = async () => {
 	try {
-		const friendCounts = await Fan.aggregate([
+		const friendCounts = await Friend.aggregate([
 			{
-				$group: {
-					_id: null,
-					pairs: { $push: { email1: '$email1', email2: '$email2' } }
+				$facet: {
+					email1Counts: [{ $group: { _id: '$email1', count: { $sum: 1 } } }],
+					email2Counts: [{ $group: { _id: '$email2', count: { $sum: 1 } } }]
 				}
 			},
-			{
-				$unwind: '$pairs'
-			},
-			{
-				$group: {
-					_id: '$pairs.email1',
-					count: { $sum: 1 }
-				}
-			},
-			{
-				$unionWith: {
-					coll: 'fans',
-					pipeline: [
-						{
-							$group: {
-								_id: '$email2',
-								count: { $sum: 1 }
-							}
-						}
-					]
-				}
-			},
+			{ $project: { allCounts: { $concatArrays: ['$email1Counts', '$email2Counts'] } } },
+			{ $unwind: '$allCounts' },
 			{
 				$group: {
-					_id: '$_id',
-					friendCount: { $sum: '$count' }
+					_id: '$allCounts._id',
+					friendCount: { $sum: '$allCounts.count' }
 				}
 			}
 		])
@@ -51,6 +31,7 @@ const syncFriendCount = async () => {
 			}
 		}))
 		if (bulkOps.length > 0) await User.bulkWrite(bulkOps)
+		console.log('更新好友')
 	} catch (error) {
 		console.error('同步好友数量时出错:', error)
 	}
