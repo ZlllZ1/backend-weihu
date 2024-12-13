@@ -9,6 +9,8 @@ const ScheduledPost = require('../mongodb/scheduledPost.js')
 const Praise = require('../mongodb/praise.js')
 const Collect = require('../mongodb/collect.js')
 const { Fan, Friend } = require('../mongodb/fan.js')
+const Comment = require('../mongodb/comment.js')
+const PraiseComment = require('../mongodb/praiseComment.js')
 
 const uploadCover = async (req, res) => {
 	const { account } = req.body
@@ -460,6 +462,110 @@ const updateShareNum = async (req, res) => {
 	}
 }
 
+const comment = async (req, res) => {
+	const { email, postId, postEmail, content, parentId, parentEmail } = req.body
+	if (!email || !postId || !content)
+		return res.sendError(400, 'email or postId or content is required')
+	try {
+		const post = await Post.findOne({ postId })
+		const comment = new Comment({
+			postEmail,
+			postId,
+			content,
+			parentId,
+			parentEmail,
+			commentDate: Date.now(),
+			user: { email: email },
+			parentUser: { email: parentEmail },
+			commentNum: 0
+		})
+		post.commentNum = post.commentNum + 1
+		await post.save()
+		if (parentId) {
+			const parentComment = await Comment.findOne({ _id: parentId })
+			parentComment.commentNum = parentComment.commentNum + 1
+			parentComment.rate = parentComment.rate + 2
+		}
+		await comment.save()
+		res.sendSuccess({ message: 'Comment successfully' })
+	} catch (error) {
+		console.error('Error in comment:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const getComments = async (req, res) => {
+	const { postId, email } = req.query
+	if (!postId || !email) return res.sendError(400, 'postId and email is required')
+	const limit = parseInt(req.query.limit) || 10
+	const page = parseInt(req.query.page) || 1
+	const skip = limit * (page - 1)
+	try {
+		const parentComments = await Comment.find({ postId, parentId: null })
+			.sort({ rate: -1, commentDate: -1 })
+			.skip(skip)
+			.limit(limit)
+			.lean()
+		const parentIds = parentComments.map(comment => comment._id.toString())
+		const childComments = await Comment.find({ postId, parentId: { $in: parentIds } })
+			.sort({ commentDate: -1 })
+			.lean()
+		const allCommentIds = [...parentIds, ...childComments.map(comment => comment._id.toString())]
+		const userPraises = await PraiseComment.find({
+			commentId: { $in: allCommentIds },
+			email: email
+		}).lean()
+		const userPraiseSet = new Set(userPraises.map(praise => praise.commentId.toString()))
+		const addPraiseInfo = comment => ({
+			...comment,
+			isPraise: userPraiseSet.has(comment._id.toString())
+		})
+		const commentsWithReplies = parentComments.map(parent => {
+			const children = childComments
+				.filter(child => child.parentId.toString() === parent._id.toString())
+				.map(addPraiseInfo)
+			return addPraiseInfo({ ...parent, replies: children })
+		})
+		const totalComments = await Comment.countDocuments({ postId, parentId: null })
+		res.sendSuccess({
+			comments: commentsWithReplies,
+			total: totalComments,
+			currentPage: page,
+			totalPages: Math.ceil(totalComments / limit)
+		})
+	} catch (error) {
+		console.error('Error in getComments:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const praiseComment = async (req, res) => {
+	const { email, commentId } = req.body
+	if (!email || !commentId) return res.sendError(400, 'email or commentId is required')
+	try {
+		const comment = await Comment.findOne({ _id: commentId })
+		if (!comment) return res.sendError(404, 'Comment not found')
+		const praise = await PraiseComment.findOne({ email, commentId })
+		if (praise) {
+			await PraiseComment.findOneAndDelete({ email, commentId })
+			await Comment.findByIdAndUpdate(commentId, { $inc: { praiseNum: -1 }, $inc: { rate: -5 } })
+			res.sendSuccess({ message: 'Praise cancelled successfully' })
+		} else {
+			const newPraise = new PraiseComment({
+				email,
+				commentId,
+				praiseDate: Date.now()
+			})
+			await newPraise.save()
+			await Comment.findByIdAndUpdate(commentId, { $inc: { praiseNum: 1 }, $inc: { rate: 5 } })
+			res.sendSuccess({ message: 'Praised successfully' })
+		}
+	} catch (error) {
+		console.error('Error in praiseComment:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	uploadCover,
 	publishPost,
@@ -472,5 +578,8 @@ module.exports = {
 	getPostInfo,
 	getPublishedPost,
 	getOnesPosts,
-	updateShareNum
+	updateShareNum,
+	comment,
+	getComments,
+	praiseComment
 }

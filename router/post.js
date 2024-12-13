@@ -28,4 +28,10 @@ router.get('/getOnesPosts', postHandler.getOnesPosts)
 
 router.post('/updateShareNum', postHandler.updateShareNum)
 
+router.post('/comment', postHandler.comment)
+
+router.get('/getComments', postHandler.getComments)
+
+router.post('/praiseComment', postHandler.praiseComment)
+
 module.exports = router

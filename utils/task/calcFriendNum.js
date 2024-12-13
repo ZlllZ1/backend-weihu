@@ -31,7 +31,6 @@ const syncFriendCount = async () => {
 			}
 		}))
 		if (bulkOps.length > 0) await User.bulkWrite(bulkOps)
-		console.log('更新好友')
 	} catch (error) {
 		console.error('同步好友数量时出错:', error)
 	}
