@@ -403,37 +403,40 @@ const getPublishedPost = async (req, res) => {
 }
 
 const getOnesPosts = async (req, res) => {
-	const { email, type } = req.query
+	const { email, type, userEmail } = req.query
 	const limit = parseInt(req.query.limit)
 	const page = parseInt(req.query.page)
 	const skip = limit * (page - 1)
 	if (!email) return res.sendError(400, 'email is required')
 	try {
-		const query = {}
+		let query = {}
+		let postIds = []
 		if (type === 'praise') {
 			const praises = await Praise.find({ email })
-			const praisedPostIds = praises.map(p => p.postId)
-			query.postId = { $in: praisedPostIds }
+			postIds = praises.map(p => p.postId)
+			query.postId = { $in: postIds }
 		} else if (type === 'collect') {
 			const collects = await Collect.find({ email })
-			const collectedPostIds = collects.map(c => c.postId)
-			query.postId = { $in: collectedPostIds }
+			postIds = collects.map(c => c.postId)
+			query.postId = { $in: postIds }
+		} else {
+			query = { email }
 		}
 		const [posts, total] = await Promise.all([
 			Post.find(query).skip(skip).limit(limit).lean(),
 			Post.countDocuments(query)
 		])
-		const postIds = posts.map(post => post.postId)
+		postIds = posts.map(post => post.postId)
 		const [praises, collects] = await Promise.all([
-			Praise.find({ email, postId: { $in: postIds } }).lean(),
-			Collect.find({ email, postId: { $in: postIds } }).lean()
+			Praise.find({ email: userEmail || email, postId: { $in: postIds } }).lean(),
+			Collect.find({ email: userEmail || email, postId: { $in: postIds } }).lean()
 		])
 		const praiseSet = new Set(praises.map(p => p.postId.toString()))
 		const collectSet = new Set(collects.map(c => c.postId.toString()))
 		const postsWithStatus = posts.map(post => ({
 			...post,
-			praise: praiseSet.has(post.postId.toString()),
-			collect: collectSet.has(post.postId.toString())
+			isPraise: praiseSet.has(post.postId.toString()),
+			isCollect: collectSet.has(post.postId.toString())
 		}))
 		res.sendSuccess({ message: 'Posts fetched successfully', posts: postsWithStatus, total, page })
 	} catch (error) {

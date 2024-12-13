@@ -322,7 +322,7 @@ const followUser = async (req, res) => {
 }
 
 const getOnesInfo = async (req, res) => {
-	const { email, type } = req.query
+	const { email, type, userEmail } = req.query
 	const limit = parseInt(req.query.limit)
 	const page = parseInt(req.query.page)
 	const skip = (page - 1) * limit
@@ -367,7 +367,7 @@ const getOnesInfo = async (req, res) => {
 				.lean(),
 			User.countDocuments(query)
 		])
-		const currentUserFollows = await Fan.find({ fanEmail: email }).lean()
+		const currentUserFollows = await Fan.find({ fanEmail: userEmail || email }).lean()
 		const followedEmails = new Set(currentUserFollows.map(f => f.followedEmail))
 		const usersWithFollowStatus = users.map(user => ({
 			...user,
