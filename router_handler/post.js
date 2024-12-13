@@ -487,7 +487,7 @@ const comment = async (req, res) => {
 			parentComment.rate = parentComment.rate + 2
 		}
 		await comment.save()
-		res.sendSuccess({ message: 'Comment successfully' })
+		res.sendSuccess({ message: 'Comment successfully', comment })
 	} catch (error) {
 		console.error('Error in comment:', error)
 		res.sendError(500, 'Internal server error')
