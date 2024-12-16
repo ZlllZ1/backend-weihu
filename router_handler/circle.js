@@ -4,22 +4,21 @@ const { Friend } = require('../mongodb/fan')
 
 const publishCircle = async (req, res) => {
 	const { email, content, delta } = req.body
-	if (!email || !content) return res.sendError(400, 'email or content is required')
+	if (!email || !content) return res.sendError(400, 'email and content are required')
 	try {
-		const user = await User.findOne({ email })
+		const user = await User.findOne({ email }, { email: 1, nickname: 1, avatar: 1 })
 		if (!user) return res.sendError(404, 'User not found')
-		const commitUser = new User({
-			email: user.email,
-			nickname: user.nickname,
-			avatar: user.avatar
-		})
-		const circleData = new Circle({
+		const circleData = {
 			email,
 			content,
-			user: commitUser,
+			user: {
+				email: user.email,
+				nickname: user.nickname,
+				avatar: user.avatar
+			},
 			delta,
-			publishDate: Date.now()
-		})
+			publishDate: new Date()
+		}
 		const circle = await createCircle(circleData)
 		const updatedUser = await User.findOneAndUpdate(
 			{ email },
@@ -27,7 +26,7 @@ const publishCircle = async (req, res) => {
 			{ new: true }
 		)
 		if (!updatedUser) {
-			await Post.deleteOne({ email })
+			await Circle.findByIdAndDelete(circle._id)
 			return res.sendError(409, 'User data has been modified')
 		}
 		res.sendSuccess({ message: 'Circle published successfully', circleId: circle.circleId })
