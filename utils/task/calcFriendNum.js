@@ -1,4 +1,3 @@
-const schedule = require('node-schedule')
 const User = require('../../mongodb/user.js')
 const { Friend } = require('../../mongodb/fan.js')
 
@@ -36,8 +35,4 @@ const syncFriendCount = async () => {
 	}
 }
 
-const scheduleCalc = () => {
-	schedule.scheduleJob('0 0 * * *', syncFriendCount)
-}
-
-scheduleCalc()
+module.exports = syncFriendCount

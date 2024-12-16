@@ -1,4 +1,4 @@
-const { mongoose } = require('./index.js')
+const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
 // chatLimit 0 全部人可私信，1 好友可私信，2 关注和好友可私信，3 关注、粉丝和好友可私信，4 都不可私信

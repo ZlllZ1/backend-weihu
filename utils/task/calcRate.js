@@ -1,7 +1,6 @@
-const schedule = require('node-schedule')
 const { Post } = require('../../mongodb/post.js')
 
-const calcRate = async () => {
+const syncCalcRate = async () => {
 	try {
 		const posts = await Post.find({})
 		for (const post of posts) {
@@ -18,8 +17,4 @@ const calcRate = async () => {
 	}
 }
 
-const scheduleCalc = () => {
-	schedule.scheduleJob('0 0 * * *', calcRate)
-}
-
-scheduleCalc()
+module.exports = syncCalcRate

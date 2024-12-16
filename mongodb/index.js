@@ -1,21 +1,10 @@
 const mongoose = require('mongoose')
+const scheduleTasks = require('../utils/task/index.js')
 
 const connectDb = async () => {
 	try {
-		await mongoose
-			.connect('mongodb://127.0.0.1:27017/main')
-			.then(() => {
-				require('../utils/task/cleanAuthCode.js')
-				require('../utils/task/calcFriendNum.js')
-				require('../utils/task/calcFanNum.js')
-				require('../utils/task/calcFollowNum.js')
-				require('../utils/task/calcPostNum.js')
-				require('../utils/task/calcPraiseNum.js')
-				require('../utils/task/calcCollectNum.js')
-				require('../utils/task/calcCircleNum.js')
-				require('../utils/task/calcRate.js')
-			})
-			.catch(err => console.error(err))
+		await mongoose.connect('mongodb://127.0.0.1:27017/main')
+		scheduleTasks()
 		console.log('数据库连接成功')
 	} catch (error) {
 		console.error('数据库连接失败', error)
