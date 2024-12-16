@@ -10,6 +10,8 @@ router.post('/publishPost', postHandler.publishPost)
 
 router.post('/saveToDraft', postHandler.saveToDraft)
 
+router.post('/clearDraft', postHandler.clearDraft)
+
 router.get('/getDraft', postHandler.getDraft)
 
 router.post('/publishScheduledPost', postHandler.publishScheduledPost)

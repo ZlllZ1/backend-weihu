@@ -232,6 +232,18 @@ const saveToDraft = async (req, res) => {
 	}
 }
 
+const clearDraft = async (req, res) => {
+	const { email } = req.body
+	if (!email) return res.sendError(400, 'email is required')
+	try {
+		await Draft.deleteMany({ email })
+		res.sendSuccess({ message: 'Posts cleared from draft successfully' })
+	} catch (error) {
+		console.error('Error in clearDraft:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 const getDraft = async (req, res) => {
 	const { email } = req.query
 	if (!email) return res.sendError(400, 'email is required')
@@ -631,5 +643,6 @@ module.exports = {
 	updateShareNum,
 	comment,
 	getComments,
-	praiseComment
+	praiseComment,
+	clearDraft
 }
