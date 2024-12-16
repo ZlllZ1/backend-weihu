@@ -468,7 +468,7 @@ const comment = async (req, res) => {
 		return res.sendError(400, 'email or postId or content is required')
 	try {
 		const post = await Post.findOne({ postId })
-		const comment = new Comment({
+		const newComment = new Comment({
 			postEmail,
 			postId,
 			content,
@@ -477,7 +477,8 @@ const comment = async (req, res) => {
 			commentDate: Date.now(),
 			user: { email: email },
 			parentUser: { email: parentEmail },
-			commentNum: 0
+			commentNum: 0,
+			rate: 0
 		})
 		post.commentNum = post.commentNum + 1
 		await post.save()
@@ -485,13 +486,48 @@ const comment = async (req, res) => {
 			const parentComment = await Comment.findOne({ _id: parentId })
 			parentComment.commentNum = parentComment.commentNum + 1
 			parentComment.rate = parentComment.rate + 2
+			await parentComment.save()
 		}
-		await comment.save()
-		res.sendSuccess({ message: 'Comment successfully', comment })
+		await newComment.save()
+		const updatedComments = await Comment.find({ postId }).lean()
+		const organizedComments = organizeCommentsAfterNew(updatedComments, newComment._id)
+		res.sendSuccess({ message: 'Comment successfully', comments: organizedComments })
 	} catch (error) {
 		console.error('Error in comment:', error)
 		res.sendError(500, 'Internal server error')
 	}
+}
+
+const organizeCommentsAfterNew = (comments, newCommentId) => {
+	const rootComments = comments.filter(c => !c.parentId)
+	const childComments = comments.filter(c => c.parentId)
+	const newComment = comments.find(c => c._id.toString() === newCommentId.toString())
+	if (newComment && !newComment.parentId) {
+		rootComments.unshift(newComment)
+		rootComments.splice(
+			rootComments.findIndex(c => c._id.toString() === newCommentId.toString()),
+			1
+		)
+	}
+	const repliesMap = new Map()
+	childComments.forEach(comment => {
+		let parentId = comment.parentId
+		while (parentId) {
+			const parent = comments.find(c => c._id.toString() === parentId)
+			if (!parent.parentId) {
+				if (!repliesMap.has(parentId)) repliesMap.set(parentId, [])
+				repliesMap.get(parentId).push(comment)
+				break
+			}
+			parentId = parent.parentId
+		}
+	})
+	rootComments.forEach(comment => {
+		const replies = repliesMap.get(comment._id.toString()) || []
+		replies.sort((a, b) => b.rate - a.rate || b.commentDate - a.commentDate)
+		comment.replies = replies
+	})
+	return rootComments
 }
 
 const getComments = async (req, res) => {
@@ -501,42 +537,56 @@ const getComments = async (req, res) => {
 	const page = parseInt(req.query.page) || 1
 	const skip = limit * (page - 1)
 	try {
-		const parentComments = await Comment.find({ postId, parentId: null })
-			.sort({ rate: -1, commentDate: -1 })
-			.skip(skip)
-			.limit(limit)
-			.lean()
-		const parentIds = parentComments.map(comment => comment._id.toString())
-		const childComments = await Comment.find({ postId, parentId: { $in: parentIds } })
-			.sort({ commentDate: -1 })
-			.lean()
-		const allCommentIds = [...parentIds, ...childComments.map(comment => comment._id.toString())]
+		const comments = await Comment.find({ postId }).lean()
+		const organizedComments = organizeComments(comments)
+		const paginatedComments = organizedComments.slice(skip, skip + limit)
+		const allCommentIds = comments.map(comment => comment._id.toString())
 		const userPraises = await PraiseComment.find({
 			commentId: { $in: allCommentIds },
 			email: email
 		}).lean()
 		const userPraiseSet = new Set(userPraises.map(praise => praise.commentId.toString()))
-		const addPraiseInfo = comment => ({
-			...comment,
-			isPraise: userPraiseSet.has(comment._id.toString())
-		})
-		const commentsWithReplies = parentComments.map(parent => {
-			const children = childComments
-				.filter(child => child.parentId.toString() === parent._id.toString())
-				.map(addPraiseInfo)
-			return addPraiseInfo({ ...parent, replies: children })
-		})
-		const totalComments = await Comment.countDocuments({ postId, parentId: null })
+		const addPraiseInfo = comment => {
+			comment.isPraise = userPraiseSet.has(comment._id.toString())
+			if (comment.replies) comment.replies.forEach(addPraiseInfo)
+			return comment
+		}
+		const commentsWithPraise = paginatedComments.map(addPraiseInfo)
 		res.sendSuccess({
-			comments: commentsWithReplies,
-			total: totalComments,
+			comments: commentsWithPraise,
+			total: organizedComments.length,
 			currentPage: page,
-			totalPages: Math.ceil(totalComments / limit)
+			totalPages: Math.ceil(organizedComments.length / limit)
 		})
 	} catch (error) {
 		console.error('Error in getComments:', error)
 		res.sendError(500, 'Internal server error')
 	}
+}
+
+const organizeComments = comments => {
+	const rootComments = comments.filter(c => !c.parentId)
+	const childComments = comments.filter(c => c.parentId)
+	rootComments.sort((a, b) => b.rate - a.rate || b.commentDate - a.commentDate)
+	const repliesMap = new Map()
+	childComments.forEach(comment => {
+		let parentId = comment.parentId
+		while (parentId) {
+			const parent = comments.find(c => c._id.toString() === parentId)
+			if (!parent.parentId) {
+				if (!repliesMap.has(parentId)) repliesMap.set(parentId, [])
+				repliesMap.get(parentId).push(comment)
+				break
+			}
+			parentId = parent.parentId
+		}
+	})
+	rootComments.forEach(comment => {
+		const replies = repliesMap.get(comment._id.toString()) || []
+		replies.sort((a, b) => b.rate - a.rate || b.commentDate - a.commentDate)
+		comment.replies = replies
+	})
+	return rootComments
 }
 
 const praiseComment = async (req, res) => {
