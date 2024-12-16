@@ -9,6 +9,8 @@ const calcPraiseNum = require('./calcPraiseNum')
 const calcCollectNum = require('./calcCollectNum')
 const calcCircleNum = require('./calcCircleNum')
 const calcRate = require('./calcRate')
+const calcPostPraiseNum = require('./calcPostPraiseNum')
+const calcPostCollectNum = require('./calcPostCollectNum')
 const calcPostCommentNum = require('./calcPostCommentNum')
 
 const scheduleTasks = () => {
@@ -22,6 +24,8 @@ const scheduleTasks = () => {
 	schedule.scheduleJob(cronSchedule, calcCollectNum)
 	schedule.scheduleJob(cronSchedule, calcCircleNum)
 	schedule.scheduleJob(cronSchedule, calcRate)
+	schedule.scheduleJob(cronSchedule, calcPostPraiseNum)
+	schedule.scheduleJob(cronSchedule, calcPostCollectNum)
 	schedule.scheduleJob(cronSchedule, calcPostCommentNum)
 }
 

@@ -1,7 +1,7 @@
 const { Post } = require('../../mongodb/post.js')
-const Comment = require('../../mongodb/comment.js')
+const Collect = require('../../mongodb/collect.js')
 
-const syncCommentCount = async () => {
+const syncCollectCount = async () => {
 	try {
 		const batchSize = 1000
 		let lastPostId = null
@@ -12,15 +12,15 @@ const syncCommentCount = async () => {
 				.limit(batchSize)
 				.lean()
 			if (postIds.length === 0) break
-			const commentCounts = await Comment.aggregate([
+			const collectCounts = await Collect.aggregate([
 				{ $match: { postId: { $in: postIds.map(p => p.postId) } } },
 				{ $group: { _id: '$postId', count: { $sum: 1 } } }
 			])
-			const commentCountMap = new Map(commentCounts.map(({ _id, count }) => [_id, count]))
+			const collectCountMap = new Map(collectCounts.map(({ _id, count }) => [_id, count]))
 			const bulkOps = postIds.map(({ postId }) => ({
 				updateOne: {
 					filter: { postId: postId },
-					update: { $set: { commentNum: commentCountMap.get(postId) || 0 } }
+					update: { $set: { collectNum: collectCountMap.get(postId) || 0 } }
 				}
 			}))
 			const result = await Post.bulkWrite(bulkOps)
@@ -28,8 +28,8 @@ const syncCommentCount = async () => {
 			lastPostId = postIds[postIds.length - 1]._id
 		}
 	} catch (error) {
-		console.error('同步帖子评论数量时出错:', error)
+		console.error('同步帖子收藏数量时出错:', error)
 	}
 }
 
-module.exports = syncCommentCount
+module.exports = syncCollectCount

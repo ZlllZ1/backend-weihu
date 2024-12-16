@@ -4,7 +4,12 @@ const syncCalcRate = async () => {
 	try {
 		const posts = await Post.find({})
 		for (const post of posts) {
-			post.rate = post.praiseNum * 5 + post.commentNum * 2 + post.collectNum * 10 + post.lookNum
+			post.rate =
+				post.praiseNum * 5 +
+				post.commentNum * 2 +
+				post.collectNum * 10 +
+				post.lookNum +
+				post.shareNum * 5
 			await post.save()
 		}
 		const sortedPosts = await Post.find({}).sort({ rate: -1 })
