@@ -14,7 +14,7 @@ const calcPostCollectNum = require('./calcPostCollectNum')
 const calcPostCommentNum = require('./calcPostCommentNum')
 
 const scheduleTasks = () => {
-	const cronSchedule = '* * * * *'
+	const cronSchedule = '0 0 * * *'
 	schedule.scheduleJob(cronSchedule, cleanAuthCode)
 	schedule.scheduleJob(cronSchedule, calcFriendNum)
 	schedule.scheduleJob(cronSchedule, calcFanNum)

@@ -18,8 +18,10 @@ const postSchema = new Schema({
 	shareNum: { type: Number, default: 0 },
 	lookNum: { type: Number, default: 0 },
 	rate: { type: Number, default: 0 },
+	show: { type: Boolean, default: true },
 	user: Object
 })
+
 postSchema.index({ rate: -1 })
 const Post = mongoose.model('Post', postSchema)
 

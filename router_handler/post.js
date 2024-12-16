@@ -11,6 +11,7 @@ const Collect = require('../mongodb/collect.js')
 const { Fan, Friend } = require('../mongodb/fan.js')
 const Comment = require('../mongodb/comment.js')
 const PraiseComment = require('../mongodb/praiseComment.js')
+const { v4: uuidv4 } = require('uuid')
 
 const uploadCover = async (req, res) => {
 	const { account } = req.body
@@ -18,8 +19,9 @@ const uploadCover = async (req, res) => {
 	try {
 		const user = await User.findOne({ email: account })
 		if (!user) return res.sendError(404, 'User not found')
+		const uniqueId = uuidv4()
 		const fileExt = path.extname(req.file.originalname)
-		const ossPath = `cover/${user._id}${fileExt}`
+		const ossPath = `cover/${uniqueId}${fileExt}`
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
 		fs.unlinkSync(req.file.path)
 		res.sendSuccess({ message: 'Cover upload successfully', coverUrl: result.url })

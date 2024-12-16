@@ -8,6 +8,7 @@ const userRouter = require('./router/user')
 const loginRouter = require('./router/login')
 const settingRouter = require('./router/setting')
 const postRouter = require('./router/post')
+const circleRouter = require('./router/circle')
 const otherRouter = require('./router/other')
 
 const app = express()
@@ -22,6 +23,7 @@ app.use('/login', loginRouter)
 app.use('/user', verifyToken, userRouter)
 app.use('/setting', verifyToken, settingRouter)
 app.use('/post', verifyToken, postRouter)
+app.use('/circle', verifyToken, circleRouter)
 app.use('/other', otherRouter)
 
 const startServer = async () => {
