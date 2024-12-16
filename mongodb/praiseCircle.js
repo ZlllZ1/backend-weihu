@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
 const praiseCircleSchema = new Schema({
-	circleId: String,
+	circleId: Number,
 	email: String,
 	praiseDate: { type: Date, default: Date.now }
 })

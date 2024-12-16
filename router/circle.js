@@ -6,4 +6,6 @@ router.post('/publishCircle', circleHandler.publishCircle)
 
 router.get('/getCircles', circleHandler.getCircles)
 
+router.post('/praiseCircle', circleHandler.praiseCircle)
+
 module.exports = router

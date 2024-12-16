@@ -1,6 +1,7 @@
 const { Circle, createCircle } = require('../mongodb/circle')
 const User = require('../mongodb/user')
 const { Friend } = require('../mongodb/fan')
+const PraiseCircle = require('../mongodb/praiseCircle')
 
 const publishCircle = async (req, res) => {
 	const { email, content, delta } = req.body
@@ -70,6 +71,32 @@ const getCircles = async (req, res) => {
 			{ $unwind: '$circles' },
 			{ $replaceRoot: { newRoot: '$circles' } },
 			{
+				$lookup: {
+					from: 'praisecircles',
+					let: { circleId: '$circleId' },
+					pipeline: [
+						{
+							$match: {
+								$expr: {
+									$and: [
+										{
+											$eq: ['$email', email]
+										},
+										{ $eq: ['$circleId', '$$circleId'] }
+									]
+								}
+							}
+						}
+					],
+					as: 'praise'
+				}
+			},
+			{
+				$addFields: {
+					isPraise: { $gt: [{ $size: '$praise' }, 0] }
+				}
+			},
+			{
 				$group: {
 					_id: null,
 					circles: { $push: '$$ROOT' },
@@ -85,7 +112,39 @@ const getCircles = async (req, res) => {
 	}
 }
 
+const praiseCircle = async (req, res) => {
+	const { email, circleId } = req.body
+	if (!email || !circleId) return res.sendError(400, 'email and circleId are required')
+	try {
+		const user = await User.findOne({ email })
+		if (!user) return res.sendError(404, 'User not found')
+		const circle = await Circle.findOne({ circleId })
+		if (!circle) return res.sendError(404, 'Circle not found')
+		const praise = await PraiseCircle.findOne({ circleId, email })
+		if (praise) {
+			await Promise.all([
+				PraiseCircle.deleteOne({ circleId, email }),
+				Circle.updateOne({ circleId: circle.circleId }, { $inc: { praiseNum: -1 } })
+			])
+			return res.sendSuccess({ message: 'Praise canceled successfully' })
+		} else {
+			const newPraise = new PraiseCircle({
+				circleId,
+				email,
+				praiseDate: Date.now()
+			})
+			await newPraise.save()
+			await Circle.updateOne({ circleId: circle.circleId }, { $inc: { praiseNum: 1 } })
+			return res.sendSuccess({ message: 'Praise successfully' })
+		}
+	} catch (error) {
+		console.error('Error in praiseCircle:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	publishCircle,
-	getCircles
+	getCircles,
+	praiseCircle
 }
