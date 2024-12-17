@@ -12,6 +12,8 @@ const calcRate = require('./calcRate')
 const calcPostPraiseNum = require('./calcPostPraiseNum')
 const calcPostCollectNum = require('./calcPostCollectNum')
 const calcPostCommentNum = require('./calcPostCommentNum')
+const calcCirclePraiseNum = require('./calcCirclePraiseNum')
+const calcCircleCommentNum = require('./calcCircleCommentNum')
 
 const scheduleTasks = () => {
 	const cronSchedule = '0 0 * * *'
@@ -27,6 +29,8 @@ const scheduleTasks = () => {
 	schedule.scheduleJob(cronSchedule, calcPostCollectNum)
 	schedule.scheduleJob(cronSchedule, calcPostCommentNum)
 	schedule.scheduleJob(cronSchedule, calcRate)
+	schedule.scheduleJob(cronSchedule, calcCirclePraiseNum)
+	schedule.scheduleJob(cronSchedule, calcCircleCommentNum)
 }
 
 module.exports = scheduleTasks
