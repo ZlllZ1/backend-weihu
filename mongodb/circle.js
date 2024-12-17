@@ -11,7 +11,8 @@ const circleSchema = new Schema({
 	praiseNum: { type: Number, default: 0 },
 	commentNum: { type: Number, default: 0 },
 	show: { type: Boolean, default: true },
-	user: Object
+	user: Object,
+	replies: { type: Array, default: [] }
 })
 
 circleSchema.index({ rate: -1 })

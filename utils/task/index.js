@@ -23,10 +23,10 @@ const scheduleTasks = () => {
 	schedule.scheduleJob(cronSchedule, calcPraiseNum)
 	schedule.scheduleJob(cronSchedule, calcCollectNum)
 	schedule.scheduleJob(cronSchedule, calcCircleNum)
-	schedule.scheduleJob(cronSchedule, calcRate)
 	schedule.scheduleJob(cronSchedule, calcPostPraiseNum)
 	schedule.scheduleJob(cronSchedule, calcPostCollectNum)
 	schedule.scheduleJob(cronSchedule, calcPostCommentNum)
+	schedule.scheduleJob(cronSchedule, calcRate)
 }
 
 module.exports = scheduleTasks

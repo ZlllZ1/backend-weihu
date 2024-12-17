@@ -4,7 +4,7 @@ const Schema = mongoose.Schema
 const commentSchema = new Schema({
 	parentId: { type: String, default: null },
 	parentEmail: String,
-	postId: String,
+	postId: Number,
 	postEmail: String,
 	content: String,
 	commentDate: { type: Date, default: Date.now },

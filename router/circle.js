@@ -12,4 +12,10 @@ router.post('/praiseCircle', circleHandler.praiseCircle)
 
 router.post('/uploadCircleImg', upload.single('circleImg'), circleHandler.uploadCircleImg)
 
+router.post('/commentCircle', circleHandler.commentCircle)
+
+router.get('/getCircleComments', circleHandler.getCircleComments)
+
+router.get('/getPraiseUsers', circleHandler.getPraiseUsers)
+
 module.exports = router

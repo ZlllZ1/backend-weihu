@@ -4,28 +4,51 @@ const Comment = require('../../mongodb/comment.js')
 const syncCommentCount = async () => {
 	try {
 		const batchSize = 1000
-		let lastPostId = null
 		let totalUpdated = 0
-		while (true) {
-			const postIds = await Post.find(lastPostId ? { _id: { $gt: lastPostId } } : {}, { postId: 1 })
-				.sort({ _id: 1 })
-				.limit(batchSize)
-				.lean()
-			if (postIds.length === 0) break
-			const commentCounts = await Comment.aggregate([
-				{ $match: { postId: { $in: postIds.map(p => p.postId) } } },
-				{ $group: { _id: '$postId', count: { $sum: 1 } } }
-			])
-			const commentCountMap = new Map(commentCounts.map(({ _id, count }) => [_id, count]))
-			const bulkOps = postIds.map(({ postId }) => ({
-				updateOne: {
-					filter: { postId: postId },
-					update: { $set: { commentNum: commentCountMap.get(postId) || 0 } }
+		let totalProcessed = 0
+		const cursor = Post.aggregate([
+			{
+				$lookup: {
+					from: 'comments',
+					localField: 'postId',
+					foreignField: 'postId',
+					as: 'comments'
 				}
-			}))
-			const result = await Post.bulkWrite(bulkOps)
-			totalUpdated += result.modifiedCount
-			lastPostId = postIds[postIds.length - 1]._id
+			},
+			{
+				$project: {
+					postId: 1,
+					commentNum: { $size: '$comments' }
+				}
+			}
+		]).cursor({ batchSize })
+		let batch = []
+		for await (const post of cursor) {
+			batch.push({
+				updateOne: {
+					filter: { postId: post.postId },
+					update: { $set: { commentNum: post.commentNum } }
+				}
+			})
+			if (batch.length === batchSize) {
+				try {
+					const result = await Post.bulkWrite(batch)
+					totalUpdated += result.modifiedCount
+					totalProcessed += batch.length
+				} catch (error) {
+					console.error('批量更新时出错:', error)
+				}
+				batch = []
+			}
+		}
+		if (batch.length > 0) {
+			try {
+				const result = await Post.bulkWrite(batch)
+				totalUpdated += result.modifiedCount
+				totalProcessed += batch.length
+			} catch (error) {
+				console.error('最后一批更新时出错:', error)
+			}
 		}
 	} catch (error) {
 		console.error('同步帖子评论数量时出错:', error)

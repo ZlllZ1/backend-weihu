@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid')
 const path = require('path')
 const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
+const CircleComment = require('../mongodb/circleComment')
 
 const publishCircle = async (req, res) => {
 	const { email, content, delta } = req.body
@@ -154,7 +155,6 @@ const uploadCircleImg = async (req, res) => {
 		const user = await User.findOne({ email })
 		if (!user) return res.sendError(404, 'User not found')
 		const uniqueId = uuidv4()
-		console.log(req)
 		const fileExt = path.extname(req.file.originalname)
 		const ossPath = `circle/${uniqueId}${fileExt}`
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
@@ -166,9 +166,134 @@ const uploadCircleImg = async (req, res) => {
 	}
 }
 
+const commentCircle = async (req, res) => {
+	const { email, circleId, circleEmail, content, parentId, parentEmail } = req.body
+	if (!email || !circleId || !content)
+		return res.sendError(400, 'email or circleId or content is required')
+	try {
+		const circle = await Circle.findOne({ circleId })
+		const newCircleComment = new CircleComment({
+			circleEmail,
+			circleId,
+			content,
+			parentId,
+			parentEmail,
+			commentDate: Date.now(),
+			user: { email: email, own: email === circleEmail },
+			parentUser: { email: parentEmail },
+			commentNum: 0
+		})
+		circle.commentNum = circle.commentNum + 1
+		await circle.save()
+		await newCircleComment.save()
+		res.sendSuccess({ message: 'Comment successfully', commentId: newCircleComment._id.toString() })
+	} catch (error) {
+		console.error('Error in comment:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const getCircleComments = async (req, res) => {
+	const { email, circleEmail, circleId } = req.query
+	if (!email || !circleEmail || !circleId)
+		return res.sendError(400, 'email or circleEmail or circleId is required')
+	try {
+		const commonFriends = await Friend.find({
+			$or: [
+				{ email1: email, email2: circleEmail },
+				{ email1: circleEmail, email2: email }
+			]
+		}).lean()
+		const emails = [
+			...new Set([
+				...commonFriends.map(f => f.email1),
+				...commonFriends.map(f => f.email2),
+				email,
+				circleEmail
+			])
+		]
+		let comments = await CircleComment.find({
+			circleId,
+			'user.email': { $in: emails }
+		})
+			.sort({ commentDate: 1 })
+			.lean()
+		comments = comments
+			.filter(comment => {
+				if (!comment.parentId) return true
+				const parentComment = comments.find(c => c._id.toString() === comment.parentId.toString())
+				return parentComment && emails.includes(parentComment.user.email)
+			})
+			.map(comment => ({
+				...comment,
+				user: {
+					...comment.user,
+					own: comment.user.email === circleEmail
+				}
+			}))
+		const organizedComments = []
+		const commentMap = new Map(comments.map(c => [c._id.toString(), c]))
+		comments.forEach(comment => {
+			if (!comment.parentId) organizedComments.push(comment)
+			else {
+				const parentIndex = organizedComments.findIndex(
+					c => c._id.toString() === comment.parentId.toString()
+				)
+				if (parentIndex !== -1) organizedComments.splice(parentIndex + 1, 0, comment)
+			}
+		})
+		res.sendSuccess({ comments: organizedComments })
+	} catch (error) {
+		console.error('Error in getCircleComments:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const getPraiseUsers = async (req, res) => {
+	const { email, circleEmail, circleId } = req.query
+	if (!email || !circleEmail || !circleId)
+		return res.sendError(400, 'email or circleEmail or circleId is required')
+	try {
+		const userFriends = await Friend.find({ $or: [{ email1: email }, { email2: email }] }).lean()
+		const circleFriends = await Friend.find({
+			$or: [{ email1: circleEmail }, { email2: circleEmail }]
+		}).lean()
+		const getUserFriendEmails = (friends, userEmail) =>
+			friends.map(f => (f.email1 === userEmail ? f.email2 : f.email1))
+		const userFriendEmails = new Set(getUserFriendEmails(userFriends, email))
+		const circleFriendEmails = new Set(getUserFriendEmails(circleFriends, circleEmail))
+		const commonFriends = new Set([...userFriendEmails].filter(x => circleFriendEmails.has(x)))
+		const praises = await PraiseCircle.find({ circleId }).lean()
+		const userDetails = await User.find(
+			{ email: { $in: praises.map(p => p.email) } },
+			'email avatar'
+		).lean()
+		const result = praises.map(praise => {
+			const userDetail = userDetails.find(u => u.email === praise.email)
+			return {
+				...praise,
+				avatar: userDetail ? userDetail.avatar : null,
+				isCommonFriend: commonFriends.has(praise.email)
+			}
+		})
+		result.sort((a, b) => {
+			if (a.isCommonFriend === b.isCommonFriend)
+				return new Date(b.praiseDate) - new Date(a.praiseDate)
+			return b.isCommonFriend ? 1 : -1
+		})
+		res.sendSuccess({ message: 'Praise users fetched successfully', praiseUsers: result })
+	} catch (error) {
+		console.error('Error in getPraiseUsers:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	publishCircle,
 	getCircles,
 	praiseCircle,
-	uploadCircleImg
+	uploadCircleImg,
+	commentCircle,
+	getCircleComments,
+	getPraiseUsers
 }
