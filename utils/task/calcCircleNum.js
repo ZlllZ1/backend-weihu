@@ -1,5 +1,5 @@
 const User = require('../../mongodb/user.js')
-const Circle = require('../../mongodb/circle.js')
+const { Circle } = require('../../mongodb/circle.js')
 
 const syncCircleCount = async () => {
 	try {

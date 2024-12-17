@@ -2,6 +2,10 @@ const { Circle, createCircle } = require('../mongodb/circle')
 const User = require('../mongodb/user')
 const { Friend } = require('../mongodb/fan')
 const PraiseCircle = require('../mongodb/praiseCircle')
+const { v4: uuidv4 } = require('uuid')
+const path = require('path')
+const OssClient = require('../utils/ossClient.js')
+const fs = require('fs')
 
 const publishCircle = async (req, res) => {
 	const { email, content, delta } = req.body
@@ -143,8 +147,28 @@ const praiseCircle = async (req, res) => {
 	}
 }
 
+const uploadCircleImg = async (req, res) => {
+	const { email } = req
+	if (!email) return res.sendError(400, 'email is required')
+	try {
+		const user = await User.findOne({ email })
+		if (!user) return res.sendError(404, 'User not found')
+		const uniqueId = uuidv4()
+		console.log(req)
+		const fileExt = path.extname(req.file.originalname)
+		const ossPath = `circle/${uniqueId}${fileExt}`
+		const result = await OssClient.uploadFile(ossPath, req.file.path)
+		fs.unlinkSync(req.file.path)
+		res.sendSuccess({ message: 'circleImg upload successfully', circleImgUrl: result.url })
+	} catch (error) {
+		console.error('Error in uploadCircleImg:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	publishCircle,
 	getCircles,
-	praiseCircle
+	praiseCircle,
+	uploadCircleImg
 }
