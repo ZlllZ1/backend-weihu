@@ -95,6 +95,7 @@ const getCircles = async (req, res) => {
 											$expr: {
 												$and: [
 													{ $eq: ['$email', '$$friendEmail'] },
+													{ $eq: ['$show', true] },
 													{
 														$or: [
 															{ $eq: ['$$friendCircleLimit', 0] },
@@ -158,7 +159,10 @@ const getCircles = async (req, res) => {
 						{
 							$lookup: {
 								from: 'circles',
-								pipeline: [{ $match: { email: email } }, { $sort: { publishDate: -1 } }],
+								pipeline: [
+									{ $match: { email: email, show: true } },
+									{ $sort: { publishDate: -1 } }
+								],
 								as: 'userCircles'
 							}
 						},
@@ -449,8 +453,12 @@ const getMyCircles = async (req, res) => {
 			matchQuery.show = true
 			matchQuery.publishDate = { $gte: visibilityDate }
 		} else {
-			if (type === 'before') matchQuery.publishDate = { $lt: visibilityDate }
-			else if (type === 'after') matchQuery.publishDate = { $gte: visibilityDate }
+			if (type === 'before')
+				matchQuery.$or = [{ show: false }, { publishDate: { $lt: visibilityDate } }]
+			else if (type === 'after') {
+				matchQuery.publishDate = { $gte: visibilityDate }
+				matchQuery.show = true
+			}
 		}
 		const result = await Circle.aggregate([
 			{ $match: matchQuery },

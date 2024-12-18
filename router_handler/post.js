@@ -93,7 +93,8 @@ const getHotPosts = async (email, skip = 0, limit = 10) => {
 				commentNum: 1,
 				lookNum: 1,
 				publishDate: 1,
-				email: 1
+				email: 1,
+				show: 1
 			}
 		}
 	])
@@ -128,21 +129,22 @@ const getPosts = async (req, res) => {
 	try {
 		let posts,
 			total,
-			query = {}
+			query = { show: true }
 		switch (type) {
 			case 'recommend':
 				posts = await getHotPosts(email, skip, limit)
-				total = await Post.countDocuments()
+				posts = posts.filter(p => p.show)
+				total = await Post.countDocuments({ show: true })
 				break
 			case 'follow':
 				const follows = await Fan.find({ fanEmail: email }).lean()
 				const followedEmails = follows.map(f => f.followedEmail)
-				query = { email: { $in: followedEmails } }
+				query = { ...query, email: { $in: followedEmails } }
 				break
 			case 'friend':
 				const friends = await Friend.find({ $or: [{ email1: email }, { email2: email }] })
 				const friendEmails = friends.map(f => (f.email1 === email ? f.email2 : f.email1))
-				query = { email: { $in: friendEmails } }
+				query = { ...query, email: { $in: friendEmails } }
 				break
 			default:
 				return res.sendError(400, 'Invalid type')
@@ -435,9 +437,9 @@ const getOnesPosts = async (req, res) => {
 			const collects = await Collect.find({ email })
 			postIds = collects.map(c => c.postId)
 			query.postId = { $in: postIds }
-		} else {
-			query = { email }
-		}
+		} else query.email = email
+		if (!userEmail) query.$or = [{ email: email }, { show: true }]
+		else query.show = true
 		const [posts, total] = await Promise.all([
 			Post.find(query).skip(skip).limit(limit).lean(),
 			Post.countDocuments(query)
