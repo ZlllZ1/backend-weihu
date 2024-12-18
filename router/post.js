@@ -36,4 +36,10 @@ router.get('/getComments', postHandler.getComments)
 
 router.post('/praiseComment', postHandler.praiseComment)
 
+router.post('/deletePost', postHandler.deletePost)
+
+router.post('/hidePost', postHandler.hidePost)
+
+router.post('/showPost', postHandler.showPost)
+
 module.exports = router

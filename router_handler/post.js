@@ -632,6 +632,54 @@ const praiseComment = async (req, res) => {
 	}
 }
 
+const deletePost = async (req, res) => {
+	const { postId, email } = req.body
+	if (!postId || !email) return res.sendError(400, 'postId or email is required')
+	try {
+		const post = await Post.findOne({ postId })
+		if (!post) return res.sendError(404, 'Post not found')
+		if (post.email !== email) return res.sendError(403, 'You are not the author of this post')
+		await User.findOneAndUpdate({ email }, { $inc: { postNum: -1 } })
+		await Post.findOneAndDelete({ postId })
+		res.sendSuccess({ message: 'Post deleted successfully' })
+	} catch (error) {
+		console.error('Error in deletePost:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const hidePost = async (req, res) => {
+	const { postId, email } = req.body
+	if (!postId || !email) return res.sendError(400, 'postId or email is required')
+	try {
+		const post = await Post.findOne({ postId })
+		if (!post) return res.sendError(404, 'Post not found')
+		if (post.email !== email) return res.sendError(403, 'You are not the author of this post')
+		post.show = false
+		await post.save()
+		res.sendSuccess({ message: 'Post hidden successfully' })
+	} catch (error) {
+		console.error('Error in hidePost:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
+const showPost = async (req, res) => {
+	const { postId, email } = req.body
+	if (!postId || !email) return res.sendError(400, 'postId or email is required')
+	try {
+		const post = await Post.findOne({ postId })
+		if (!post) return res.sendError(404, 'Post not found')
+		if (post.email !== email) return res.sendError(403, 'You are not the author of this post')
+		post.show = true
+		await post.save()
+		res.sendSuccess({ message: 'Post hidden successfully' })
+	} catch (error) {
+		console.error('Error in hidePost:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	uploadCover,
 	publishPost,
@@ -648,5 +696,8 @@ module.exports = {
 	comment,
 	getComments,
 	praiseComment,
-	clearDraft
+	clearDraft,
+	deletePost,
+	hidePost,
+	showPost
 }
