@@ -52,44 +52,139 @@ const getCircles = async (req, res) => {
 	try {
 		const result = await Friend.aggregate([
 			{
-				$match: { $or: [{ email1: email }, { email2: email }] }
+				$facet: {
+					friendCircles: [
+						{
+							$match: { $or: [{ email1: email }, { email2: email }] }
+						},
+						{
+							$project: {
+								friendEmail: {
+									$cond: { if: { $eq: ['$email1', email] }, then: '$email2', else: '$email1' }
+								}
+							}
+						},
+						{
+							$lookup: {
+								from: 'users',
+								localField: 'friendEmail',
+								foreignField: 'email',
+								as: 'friendUser'
+							}
+						},
+						{ $unwind: '$friendUser' },
+						{
+							$lookup: {
+								from: 'settings',
+								localField: 'friendUser.setting',
+								foreignField: '_id',
+								as: 'friendUserSetting'
+							}
+						},
+						{ $unwind: '$friendUserSetting' },
+						{
+							$lookup: {
+								from: 'circles',
+								let: {
+									friendEmail: '$friendEmail',
+									friendCircleLimit: '$friendUserSetting.circleLimit'
+								},
+								pipeline: [
+									{
+										$match: {
+											$expr: {
+												$and: [
+													{ $eq: ['$email', '$$friendEmail'] },
+													{
+														$or: [
+															{ $eq: ['$$friendCircleLimit', 0] },
+															{
+																$gte: [
+																	'$publishDate',
+																	{
+																		$subtract: [
+																			new Date(),
+																			{
+																				$multiply: [
+																					{
+																						$switch: {
+																							branches: [
+																								{
+																									case: { $eq: ['$$friendCircleLimit', 3] },
+																									then: 3
+																								},
+																								{
+																									case: { $eq: ['$$friendCircleLimit', 7] },
+																									then: 7
+																								},
+																								{
+																									case: { $eq: ['$$friendCircleLimit', 30] },
+																									then: 30
+																								},
+																								{
+																									case: { $eq: ['$$friendCircleLimit', 180] },
+																									then: 180
+																								},
+																								{
+																									case: { $eq: ['$$friendCircleLimit', 365] },
+																									then: 365
+																								}
+																							],
+																							default: 0
+																						}
+																					},
+																					24 * 60 * 60 * 1000
+																				]
+																			}
+																		]
+																	}
+																]
+															}
+														]
+													}
+												]
+											}
+										}
+									},
+									{ $sort: { publishDate: -1 } }
+								],
+								as: 'circles'
+							}
+						},
+						{ $unwind: '$circles' },
+						{ $replaceRoot: { newRoot: '$circles' } }
+					],
+					userCircles: [
+						{
+							$lookup: {
+								from: 'circles',
+								pipeline: [{ $match: { email: email } }, { $sort: { publishDate: -1 } }],
+								as: 'userCircles'
+							}
+						},
+						{ $unwind: '$userCircles' },
+						{ $replaceRoot: { newRoot: '$userCircles' } }
+					]
+				}
 			},
 			{
 				$project: {
-					friendEmail: {
-						$cond: { if: { $eq: ['$email1', email] }, then: '$email2', else: '$email1' }
-					}
+					allCircles: { $concatArrays: ['$friendCircles', '$userCircles'] }
 				}
 			},
-			{
-				$lookup: {
-					from: 'circles',
-					let: { friendEmails: ['$friendEmail', email] },
-					pipeline: [
-						{ $match: { $expr: { $in: ['$email', '$$friendEmails'] } } },
-						{ $sort: { publishDate: -1 } },
-						{ $skip: skip },
-						{ $limit: limit }
-					],
-					as: 'circles'
-				}
-			},
-			{ $unwind: '$circles' },
-			{ $replaceRoot: { newRoot: '$circles' } },
+			{ $unwind: '$allCircles' },
+			{ $sort: { 'allCircles.publishDate': -1 } },
+			{ $skip: skip },
+			{ $limit: limit },
 			{
 				$lookup: {
 					from: 'praisecircles',
-					let: { circleId: '$circleId' },
+					let: { circleId: '$allCircles.circleId' },
 					pipeline: [
 						{
 							$match: {
 								$expr: {
-									$and: [
-										{
-											$eq: ['$email', email]
-										},
-										{ $eq: ['$circleId', '$$circleId'] }
-									]
+									$and: [{ $eq: ['$email', email] }, { $eq: ['$circleId', '$$circleId'] }]
 								}
 							}
 						}
@@ -99,13 +194,13 @@ const getCircles = async (req, res) => {
 			},
 			{
 				$addFields: {
-					isPraise: { $gt: [{ $size: '$praise' }, 0] }
+					'allCircles.isPraise': { $gt: [{ $size: '$praise' }, 0] }
 				}
 			},
 			{
 				$group: {
 					_id: null,
-					circles: { $push: '$$ROOT' },
+					circles: { $push: '$allCircles' },
 					total: { $sum: 1 }
 				}
 			}
