@@ -445,12 +445,21 @@ const getMyCircles = async (req, res) => {
 						{
 							$match: {
 								$expr: {
-									$eq: ['$circleId', '$$circleId']
+									$and: [
+										{ $eq: ['$circleId', '$$circleId'] },
+										{
+											$or: [
+												{ $in: ['$user.email', commonFriendEmails] },
+												{ $eq: ['$user.email', email] },
+												{ $eq: ['$user.email', visitEmail] }
+											]
+										}
+									]
 								}
 							}
 						}
 					],
-					as: 'allComments'
+					as: 'comments'
 				}
 			},
 			{
@@ -464,26 +473,13 @@ const getMyCircles = async (req, res) => {
 					},
 					praiseNum: { $size: '$praises' },
 					commentNum: {
-						$cond: {
-							if: { $eq: ['$email', visitEmail] },
-							then: { $size: '$allComments' },
-							else: {
-								$size: {
-									$filter: {
-										input: '$allComments',
-										as: 'comment',
-										cond: { $in: ['$$comment.email', commonFriendEmails] }
-									}
-								}
-							}
-						}
+						$size: '$comments'
 					}
 				}
 			},
 			{
 				$project: {
-					praises: 0,
-					allComments: 0
+					praises: 0
 				}
 			}
 		])
