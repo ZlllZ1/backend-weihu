@@ -641,6 +641,10 @@ const deletePost = async (req, res) => {
 		if (post.email !== email) return res.sendError(403, 'You are not the author of this post')
 		await User.findOneAndUpdate({ email }, { $inc: { postNum: -1 } })
 		await Post.findOneAndDelete({ postId })
+		await Comment.deleteMany({ postId })
+		await PraiseComment.deleteMany({ postId })
+		await Praise.deleteMany({ postId })
+		await Collect.deleteMany({ postId })
 		res.sendSuccess({ message: 'Post deleted successfully' })
 	} catch (error) {
 		console.error('Error in deletePost:', error)

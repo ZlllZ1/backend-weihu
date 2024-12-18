@@ -20,4 +20,10 @@ router.get('/getPraiseUsers', circleHandler.getPraiseUsers)
 
 router.get('/getMyCircles', circleHandler.getMyCircles)
 
+router.post('/deleteCircle', circleHandler.deleteCircle)
+
+router.post('/hideCircle', circleHandler.hideCircle)
+
+router.post('/showCircle', circleHandler.showCircle)
+
 module.exports = router
