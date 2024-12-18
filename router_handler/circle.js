@@ -179,22 +179,82 @@ const getCircles = async (req, res) => {
 			{
 				$lookup: {
 					from: 'praisecircles',
-					let: { circleId: '$allCircles.circleId' },
+					let: { circleId: '$allCircles.circleId', circleEmail: '$allCircles.email' },
 					pipeline: [
 						{
 							$match: {
 								$expr: {
-									$and: [{ $eq: ['$email', email] }, { $eq: ['$circleId', '$$circleId'] }]
+									$and: [
+										{ $eq: ['$circleId', '$$circleId'] },
+										{
+											$or: [
+												{ $eq: ['$email', email] },
+												{ $eq: ['$email', '$$circleEmail'] },
+												{
+													$and: [
+														{
+															$in: [
+																'$email',
+																{ $literal: await getCommonFriends(email, '$$circleEmail') }
+															]
+														},
+														{ $ne: ['$email', email] },
+														{ $ne: ['$email', '$$circleEmail'] }
+													]
+												}
+											]
+										}
+									]
 								}
 							}
 						}
 					],
-					as: 'praise'
+					as: 'praises'
+				}
+			},
+			{
+				$lookup: {
+					from: 'circlecomments',
+					let: { circleId: '$allCircles.circleId', circleEmail: '$allCircles.email' },
+					pipeline: [
+						{
+							$match: {
+								$expr: {
+									$and: [
+										{ $eq: ['$circleId', '$$circleId'] },
+										{
+											$or: [
+												{ $eq: ['$user.email', email] },
+												{ $eq: ['$user.email', '$$circleEmail'] },
+												{
+													$and: [
+														{
+															$in: [
+																'$user.email',
+																{ $literal: await getCommonFriends(email, '$$circleEmail') }
+															]
+														},
+														{ $ne: ['$user.email', email] },
+														{ $ne: ['$user.email', '$$circleEmail'] }
+													]
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					as: 'comments'
 				}
 			},
 			{
 				$addFields: {
-					'allCircles.isPraise': { $gt: [{ $size: '$praise' }, 0] }
+					'allCircles.isPraise': {
+						$in: [email, '$praises.email']
+					},
+					'allCircles.praiseNum': { $size: '$praises' },
+					'allCircles.commentNum': { $size: '$comments' }
 				}
 			},
 			{
@@ -211,6 +271,16 @@ const getCircles = async (req, res) => {
 		console.error('Error in getCircles:', error)
 		res.sendError(500, 'Internal server error')
 	}
+}
+
+const getCommonFriends = async (email1, email2) => {
+	const friends1 = await Friend.find({ $or: [{ email1: email1 }, { email2: email1 }] })
+	const friends2 = await Friend.find({ $or: [{ email1: email2 }, { email2: email2 }] })
+	const friendList1 = friends1.map(f => (f.email1 === email1 ? f.email2 : f.email1))
+	const friendList2 = friends2.map(f => (f.email1 === email2 ? f.email2 : f.email1))
+	const commonFriends = friendList1.filter(f => friendList2.includes(f))
+	commonFriends.push(email2)
+	return commonFriends
 }
 
 const praiseCircle = async (req, res) => {
@@ -294,20 +364,7 @@ const getCircleComments = async (req, res) => {
 	if (!email || !circleEmail || !circleId)
 		return res.sendError(400, 'email or circleEmail or circleId is required')
 	try {
-		const commonFriends = await Friend.find({
-			$or: [
-				{ email1: email, email2: circleEmail },
-				{ email1: circleEmail, email2: email }
-			]
-		}).lean()
-		const emails = [
-			...new Set([
-				...commonFriends.map(f => f.email1),
-				...commonFriends.map(f => f.email2),
-				email,
-				circleEmail
-			])
-		]
+		const emails = await getCommonFriends(email, circleEmail)
 		let comments = await CircleComment.find({
 			circleId,
 			'user.email': { $in: emails }
@@ -328,7 +385,6 @@ const getCircleComments = async (req, res) => {
 				}
 			}))
 		const organizedComments = []
-		const commentMap = new Map(comments.map(c => [c._id.toString(), c]))
 		comments.forEach(comment => {
 			if (!comment.parentId) organizedComments.push(comment)
 			else {
@@ -338,7 +394,7 @@ const getCircleComments = async (req, res) => {
 				if (parentIndex !== -1) organizedComments.splice(parentIndex + 1, 0, comment)
 			}
 		})
-		res.sendSuccess({ comments: organizedComments })
+		res.sendSuccess({ message: 'circle comments fetch successfully', comments: organizedComments })
 	} catch (error) {
 		console.error('Error in getCircleComments:', error)
 		res.sendError(500, 'Internal server error')
@@ -350,15 +406,7 @@ const getPraiseUsers = async (req, res) => {
 	if (!email || !circleEmail || !circleId)
 		return res.sendError(400, 'email or circleEmail or circleId is required')
 	try {
-		const userFriends = await Friend.find({ $or: [{ email1: email }, { email2: email }] }).lean()
-		const circleFriends = await Friend.find({
-			$or: [{ email1: circleEmail }, { email2: circleEmail }]
-		}).lean()
-		const getUserFriendEmails = (friends, userEmail) =>
-			friends.map(f => (f.email1 === userEmail ? f.email2 : f.email1))
-		const userFriendEmails = new Set(getUserFriendEmails(userFriends, email))
-		const circleFriendEmails = new Set(getUserFriendEmails(circleFriends, circleEmail))
-		const commonFriends = new Set([...userFriendEmails].filter(x => circleFriendEmails.has(x)))
+		const commonFriends = await getCommonFriends(email, circleEmail)
 		const praises = await PraiseCircle.find({ circleId }).lean()
 		const userDetails = await User.find(
 			{ email: { $in: praises.map(p => p.email) } },
@@ -369,7 +417,7 @@ const getPraiseUsers = async (req, res) => {
 			return {
 				...praise,
 				avatar: userDetail ? userDetail.avatar : null,
-				isCommonFriend: commonFriends.has(praise.email)
+				isCommonFriend: commonFriends.includes(praise.email)
 			}
 		})
 		result.sort((a, b) => {
@@ -395,16 +443,7 @@ const getMyCircles = async (req, res) => {
 		if (!user) return res.sendError(404, 'User not found')
 		const circleLimit = user.setting.circleLimit
 		const visibilityDate = new Date(Date.now() - circleLimit * 24 * 60 * 60 * 1000)
-		const emailFriends = await Friend.find({ $or: [{ email1: email }, { email2: email }] })
-		const emailFriendList = emailFriends.map(f => (f.email1 === email ? f.email2 : f.email1))
-		const visitEmailFriends = await Friend.find({
-			$or: [{ email1: visitEmail }, { email2: visitEmail }]
-		})
-		const visitEmailFriendList = visitEmailFriends.map(f =>
-			f.email1 === visitEmail ? f.email2 : f.email1
-		)
-		const commonFriendEmails = emailFriendList.filter(f => visitEmailFriendList.includes(f))
-		commonFriendEmails.push(email, visitEmail)
+		const commonFriendEmails = await getCommonFriends(email, visitEmail)
 		let matchQuery = { email }
 		if (email !== visitEmail) {
 			matchQuery.show = true
