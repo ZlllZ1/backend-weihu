@@ -545,7 +545,7 @@ const getMyCircles = async (req, res) => {
 }
 
 const deleteCircle = async (req, res) => {
-	const { circleId, email } = req.query
+	const { circleId, email } = req.body
 	if (!circleId || !email) return res.sendError(400, 'circleId or email is required')
 	try {
 		const circle = await Circle.findOne({ circleId })
@@ -563,14 +563,14 @@ const deleteCircle = async (req, res) => {
 }
 
 const hideCircle = async (req, res) => {
-	const { circleId, email } = req.query
+	const { circleId, email } = req.body
 	if (!circleId || !email) return res.sendError(400, 'circleId or email is required')
 	try {
 		const circle = await Circle.findOne({ circleId })
 		if (!circle) return res.sendError(404, 'Circle not found')
 		if (circle.email !== email) return res.sendError(403, 'You are not the owner of this circle')
 		await Circle.findOneAndUpdate({ circleId }, { show: false })
-		res.savedSuccess({ message: 'Circle hidden successfully' })
+		res.sendSuccess({ message: 'Circle hidden successfully' })
 	} catch (error) {
 		console.error('Error in hideCircle:', error)
 		res.sendError(500, 'Internal server error')
@@ -578,14 +578,14 @@ const hideCircle = async (req, res) => {
 }
 
 const showCircle = async (req, res) => {
-	const { circleId, email } = req.query
+	const { circleId, email } = req.body
 	if (!circleId || !email) return res.sendError(400, 'circleId or email is required')
 	try {
 		const circle = await Circle.findOne({ circleId })
 		if (!circle) return res.sendError(404, 'Circle not found')
 		if (circle.email !== email) return res.sendError(403, 'You are not the owner of this circle')
 		await Circle.findOneAndUpdate({ circleId }, { show: true })
-		res.savedSuccess({ message: 'Circle hidden successfully' })
+		res.sendSuccess({ message: 'Circle hidden successfully' })
 	} catch (error) {
 		console.error('Error in hideCircle:', error)
 		res.sendError(500, 'Internal server error')
