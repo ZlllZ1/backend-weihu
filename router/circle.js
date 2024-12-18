@@ -18,4 +18,6 @@ router.get('/getCircleComments', circleHandler.getCircleComments)
 
 router.get('/getPraiseUsers', circleHandler.getPraiseUsers)
 
+router.get('/getMyCircles', circleHandler.getMyCircles)
+
 module.exports = router

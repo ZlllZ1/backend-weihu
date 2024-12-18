@@ -7,6 +7,7 @@ const path = require('path')
 const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const CircleComment = require('../mongodb/circleComment')
+const moment = require('moment')
 
 const publishCircle = async (req, res) => {
 	const { email, content, delta } = req.body
@@ -288,6 +289,59 @@ const getPraiseUsers = async (req, res) => {
 	}
 }
 
+const getMyCircles = async (req, res) => {
+	const { email, type } = req.query
+	const limit = parseInt(req.query.limit) || 10
+	const page = parseInt(req.query.page) || 1
+	const skip = (page - 1) * limit
+	if (!email) return res.sendError(400, 'email is required')
+	try {
+		const user = await User.findOne({ email }).populate('setting')
+		if (!user) return res.sendError(404, 'User not found')
+		const circleLimit = user.setting.circleLimit
+		console.log(circleLimit, 'circleLimit')
+		const visibilityDate = moment().subtract(circleLimit, 'days').toDate()
+		console.log(visibilityDate, 'visibilityDate')
+		let query = { email }
+		if (type === 'before') {
+			if (circleLimit !== 0) {
+				query.publishDate = { $lt: visibilityDate }
+			} else {
+				return res.sendSuccess({ message: 'No circles', circles: [], total: 0 })
+			}
+		} else if (type === 'after') {
+			if (circleLimit !== 0) {
+				query.publishDate = { $gte: visibilityDate }
+			}
+		}
+		const [circles, total] = await Promise.all([
+			Circle.find(query).sort({ publishDate: -1 }).skip(skip).limit(limit),
+			Circle.countDocuments({ query })
+		])
+		const circlesWithPraise = await Promise.all(
+			circles.map(async circle => {
+				const praiseRecord = await PraiseCircle.findOne({
+					circleId: circle.circleId,
+					email: email
+				})
+				return {
+					...circle.toObject(),
+					isPraise: !!praiseRecord
+				}
+			})
+		)
+		res.sendSuccess({
+			circles: circlesWithPraise,
+			total,
+			currentPage: page,
+			totalPages: Math.ceil(total / limit)
+		})
+	} catch (error) {
+		console.error('Error in getMyCircles:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	publishCircle,
 	getCircles,
@@ -295,5 +349,6 @@ module.exports = {
 	uploadCircleImg,
 	commentCircle,
 	getCircleComments,
-	getPraiseUsers
+	getPraiseUsers,
+	getMyCircles
 }
