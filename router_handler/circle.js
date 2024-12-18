@@ -385,48 +385,112 @@ const getPraiseUsers = async (req, res) => {
 }
 
 const getMyCircles = async (req, res) => {
-	const { email, type } = req.query
+	const { email, type, visitEmail } = req.query
 	const limit = parseInt(req.query.limit) || 10
 	const page = parseInt(req.query.page) || 1
 	const skip = (page - 1) * limit
-	if (!email) return res.sendError(400, 'email is required')
+	if (!email || !visitEmail) return res.sendError(400, 'email or visitEmail is required')
 	try {
 		const user = await User.findOne({ email }).populate('setting')
 		if (!user) return res.sendError(404, 'User not found')
 		const circleLimit = user.setting.circleLimit
-		console.log(circleLimit, 'circleLimit')
-		const visibilityDate = moment().subtract(circleLimit, 'days').toDate()
-		console.log(visibilityDate, 'visibilityDate')
-		let query = { email }
-		if (type === 'before') {
-			if (circleLimit !== 0) {
-				query.publishDate = { $lt: visibilityDate }
-			} else {
-				return res.sendSuccess({ message: 'No circles', circles: [], total: 0 })
-			}
-		} else if (type === 'after') {
-			if (circleLimit !== 0) {
-				query.publishDate = { $gte: visibilityDate }
-			}
-		}
-		const [circles, total] = await Promise.all([
-			Circle.find(query).sort({ publishDate: -1 }).skip(skip).limit(limit),
-			Circle.countDocuments({ query })
-		])
-		const circlesWithPraise = await Promise.all(
-			circles.map(async circle => {
-				const praiseRecord = await PraiseCircle.findOne({
-					circleId: circle.circleId,
-					email: email
-				})
-				return {
-					...circle.toObject(),
-					isPraise: !!praiseRecord
-				}
-			})
+		const visibilityDate = new Date(Date.now() - circleLimit * 24 * 60 * 60 * 1000)
+		const emailFriends = await Friend.find({ $or: [{ email1: email }, { email2: email }] })
+		const emailFriendList = emailFriends.map(f => (f.email1 === email ? f.email2 : f.email1))
+		const visitEmailFriends = await Friend.find({
+			$or: [{ email1: visitEmail }, { email2: visitEmail }]
+		})
+		const visitEmailFriendList = visitEmailFriends.map(f =>
+			f.email1 === visitEmail ? f.email2 : f.email1
 		)
+		const commonFriendEmails = emailFriendList.filter(f => visitEmailFriendList.includes(f))
+		commonFriendEmails.push(email, visitEmail)
+		let matchQuery = { email }
+		if (email !== visitEmail) {
+			matchQuery.show = true
+			matchQuery.publishDate = { $gte: visibilityDate }
+		} else {
+			if (type === 'before') matchQuery.publishDate = { $lt: visibilityDate }
+			else if (type === 'after') matchQuery.publishDate = { $gte: visibilityDate }
+		}
+		const result = await Circle.aggregate([
+			{ $match: matchQuery },
+			{ $sort: { publishDate: -1 } },
+			{ $skip: skip },
+			{ $limit: limit },
+			{
+				$lookup: {
+					from: 'praisecircles',
+					let: { circleId: '$circleId' },
+					pipeline: [
+						{
+							$match: {
+								$expr: {
+									$and: [
+										{ $eq: ['$circleId', '$$circleId'] },
+										{ $in: ['$email', commonFriendEmails] }
+									]
+								}
+							}
+						}
+					],
+					as: 'praises'
+				}
+			},
+			{
+				$lookup: {
+					from: 'circlecomments',
+					let: { circleId: '$circleId' },
+					pipeline: [
+						{
+							$match: {
+								$expr: {
+									$eq: ['$circleId', '$$circleId']
+								}
+							}
+						}
+					],
+					as: 'allComments'
+				}
+			},
+			{
+				$addFields: {
+					isPraise: {
+						$cond: {
+							if: { $in: [visitEmail, '$praises.email'] },
+							then: true,
+							else: false
+						}
+					},
+					praiseNum: { $size: '$praises' },
+					commentNum: {
+						$cond: {
+							if: { $eq: ['$email', visitEmail] },
+							then: { $size: '$allComments' },
+							else: {
+								$size: {
+									$filter: {
+										input: '$allComments',
+										as: 'comment',
+										cond: { $in: ['$$comment.email', commonFriendEmails] }
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			{
+				$project: {
+					praises: 0,
+					allComments: 0
+				}
+			}
+		])
+		const total = await Circle.countDocuments(matchQuery)
 		res.sendSuccess({
-			circles: circlesWithPraise,
+			message: 'Circles fetched successfully',
+			circles: result,
 			total,
 			currentPage: page,
 			totalPages: Math.ceil(total / limit)
