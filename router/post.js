@@ -42,4 +42,6 @@ router.post('/hidePost', postHandler.hidePost)
 
 router.post('/showPost', postHandler.showPost)
 
+router.post('/deleteComment', postHandler.deleteComment)
+
 module.exports = router

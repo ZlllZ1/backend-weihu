@@ -26,4 +26,6 @@ router.post('/hideCircle', circleHandler.hideCircle)
 
 router.post('/showCircle', circleHandler.showCircle)
 
+router.post('/deleteComment', circleHandler.deleteComment)
+
 module.exports = router

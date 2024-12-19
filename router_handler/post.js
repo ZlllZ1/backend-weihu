@@ -515,34 +515,41 @@ const comment = async (req, res) => {
 }
 
 const organizeCommentsAfterNew = (comments, newCommentId) => {
-	const rootComments = comments.filter(c => !c.parentId)
-	const childComments = comments.filter(c => c.parentId)
 	const newComment = comments.find(c => c._id.toString() === newCommentId.toString())
-	if (newComment && !newComment.parentId) {
-		rootComments.unshift(newComment)
-		rootComments.splice(
-			rootComments.findIndex(c => c._id.toString() === newCommentId.toString()),
-			1
-		)
-	}
+	const otherComments = comments.filter(c => c._id.toString() !== newCommentId.toString())
+	const rootComments = otherComments.filter(c => !c.parentId)
+	const childComments = otherComments.filter(c => c.parentId)
+
 	const repliesMap = new Map()
 	childComments.forEach(comment => {
-		let parentId = comment.parentId
-		while (parentId) {
-			const parent = comments.find(c => c._id.toString() === parentId)
-			if (!parent.parentId) {
-				if (!repliesMap.has(parentId)) repliesMap.set(parentId, [])
-				repliesMap.get(parentId).push(comment)
-				break
-			}
-			parentId = parent.parentId
+		const rootParentId = findRootParentId(comment, otherComments)
+		if (!repliesMap.has(rootParentId)) repliesMap.set(rootParentId, [])
+		repliesMap.get(rootParentId).push(comment)
+	})
+
+	function findRootParentId(comment, allComments) {
+		if (!comment.parentId) return comment._id.toString()
+		const parent = allComments.find(c => c._id.toString() === comment.parentId)
+		return parent ? findRootParentId(parent, allComments) : comment.parentId
+	}
+
+	if (newComment) {
+		const rootParentId = findRootParentId(newComment, otherComments)
+		if (rootParentId !== newComment._id.toString()) {
+			if (!repliesMap.has(rootParentId)) repliesMap.set(rootParentId, [])
+			repliesMap.get(rootParentId).unshift(newComment)
+		} else {
+			rootComments.unshift(newComment)
 		}
-	})
+	}
+
 	rootComments.forEach(comment => {
-		const replies = repliesMap.get(comment._id.toString()) || []
-		replies.sort((a, b) => b.rate - a.rate || b.commentDate - a.commentDate)
-		comment.replies = replies
+		comment.replies = (repliesMap.get(comment._id.toString()) || []).sort((a, b) => {
+			if (a.rate !== b.rate) return b.rate > a.rate
+			return b.commentDate >= a.commentDate
+		})
 	})
+
 	return rootComments
 }
 
@@ -589,7 +596,7 @@ const organizeComments = comments => {
 		let parentId = comment.parentId
 		while (parentId) {
 			const parent = comments.find(c => c._id.toString() === parentId)
-			if (!parent.parentId) {
+			if (!parent?.parentId) {
 				if (!repliesMap.has(parentId)) repliesMap.set(parentId, [])
 				repliesMap.get(parentId).push(comment)
 				break
@@ -684,6 +691,41 @@ const showPost = async (req, res) => {
 	}
 }
 
+const deleteComment = async (req, res) => {
+	const { postId, commentId, email } = req.body
+	if (!postId || !commentId || !email)
+		return res.sendError(400, 'postId, commentId and email are required')
+	try {
+		const post = await Post.findOne({ postId })
+		if (!post) return res.sendError(404, 'Post not found')
+		const comment = await Comment.findOne({ _id: commentId, postId })
+		if (!comment) return res.sendError(404, 'Comment not found')
+		if (post.email !== email && comment.email !== email)
+			return res.sendError(403, 'You are not authorized to delete this comment')
+		const commentsToDelete = await getCommentsToDelete(postId, commentId)
+		const deleteResult = await Comment.deleteMany({ _id: { $in: commentsToDelete } })
+		const deleteNum = deleteResult.deletedCount
+		await Post.findOneAndUpdate(
+			{ postId },
+			{ $inc: { commentNum: -deleteNum, rate: -2 * deleteNum } }
+		)
+		res.sendSuccess({ message: 'Comment deleted successfully', deleteNum })
+	} catch (error) {
+		console.error('Error in deleteComment:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+const getCommentsToDelete = async (postId, commentId) => {
+	const commentsToDelete = [commentId]
+	let childComments = await Comment.find({ postId, parentId: commentId })
+	for (let childComment of childComments) {
+		commentsToDelete.push(childComment._id)
+		const grandChildComments = await getCommentsToDelete(postId, childComment._id)
+		commentsToDelete.push(...grandChildComments)
+	}
+	return commentsToDelete
+}
+
 module.exports = {
 	uploadCover,
 	publishPost,
@@ -703,5 +745,6 @@ module.exports = {
 	clearDraft,
 	deletePost,
 	hidePost,
-	showPost
+	showPost,
+	deleteComment
 }

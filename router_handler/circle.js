@@ -368,10 +368,11 @@ const getCircleComments = async (req, res) => {
 	if (!email || !circleEmail || !circleId)
 		return res.sendError(400, 'email or circleEmail or circleId is required')
 	try {
-		const emails = await getCommonFriends(email, circleEmail)
+		const commonFriends = await getCommonFriends(email, circleEmail)
+		const emailsToQuery = [...commonFriends, email, circleEmail]
 		let comments = await CircleComment.find({
 			circleId,
-			'user.email': { $in: emails }
+			'user.email': { $in: emailsToQuery }
 		})
 			.sort({ commentDate: 1 })
 			.lean()
@@ -379,7 +380,7 @@ const getCircleComments = async (req, res) => {
 			.filter(comment => {
 				if (!comment.parentId) return true
 				const parentComment = comments.find(c => c._id.toString() === comment.parentId.toString())
-				return parentComment && emails.includes(parentComment.user.email)
+				return parentComment && emailsToQuery.includes(parentComment.user.email)
 			})
 			.map(comment => ({
 				...comment,
@@ -592,6 +593,38 @@ const showCircle = async (req, res) => {
 	}
 }
 
+const deleteComment = async (req, res) => {
+	const { circleId, commentId, email } = req.body
+	if (!circleId || !commentId || !email)
+		return res.sendError(400, 'circleId, commentId and email are required')
+	try {
+		const circle = await Circle.findOne({ circleId })
+		if (!circle) return res.sendError(404, 'Circle not found')
+		const comment = await CircleComment.findOne({ circleId, _id: commentId })
+		if (!comment) return res.sendError(404, 'Comment not found')
+		if (circle.email !== email && comment.email !== email)
+			return res.sendError(403, 'You are not authorized to delete this comment')
+		const commentsToDelete = await getCommentsToDelete(circleId, commentId)
+		const deleteResult = await CircleComment.deleteMany({ _id: { $in: commentsToDelete } })
+		const deleteNum = deleteResult.deletedCount
+		await Circle.findOneAndUpdate({ circleId }, { $inc: { commentNum: -deleteNum } })
+		res.sendSuccess({ message: 'Comment deleted successfully', deleteNum })
+	} catch (error) {
+		console.error('Error in deleteComment:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+const getCommentsToDelete = async (circleId, commentId) => {
+	const commentsToDelete = [commentId]
+	let childComments = await CircleComment.find({ circleId, parentId: commentId })
+	for (let childComment of childComments) {
+		commentsToDelete.push(childComment._id)
+		const grandChildComments = await getCommentsToDelete(circleId, childComment._id)
+		commentsToDelete.push(...grandChildComments)
+	}
+	return commentsToDelete
+}
+
 module.exports = {
 	publishCircle,
 	getCircles,
@@ -603,5 +636,6 @@ module.exports = {
 	getMyCircles,
 	deleteCircle,
 	hideCircle,
-	showCircle
+	showCircle,
+	deleteComment
 }
