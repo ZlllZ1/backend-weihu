@@ -700,7 +700,7 @@ const deleteComment = async (req, res) => {
 		if (!post) return res.sendError(404, 'Post not found')
 		const comment = await Comment.findOne({ _id: commentId, postId })
 		if (!comment) return res.sendError(404, 'Comment not found')
-		if (post.email !== email && comment.email !== email)
+		if (post.email !== email && comment.user.email !== email)
 			return res.sendError(403, 'You are not authorized to delete this comment')
 		const commentsToDelete = await getCommentsToDelete(postId, commentId)
 		const deleteResult = await Comment.deleteMany({ _id: { $in: commentsToDelete } })

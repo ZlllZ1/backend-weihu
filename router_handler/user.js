@@ -250,6 +250,12 @@ const followUser = async (req, res) => {
 			if (isFriend) {
 				updateFanOp.$inc.friendNum = -1
 				updateFollowedOp.$inc.friendNum = -1
+				await Friend.deleteOne({
+					$or: [
+						{ email1: fanEmail, email2: followedEmail },
+						{ email1: followedEmail, email2: fanEmail }
+					]
+				})
 			}
 			const [updatedFan, updatedFollowed] = await Promise.all([
 				User.findOneAndUpdate({ email: fanEmail, version: fan.version }, updateFanOp, {
@@ -266,56 +272,36 @@ const followUser = async (req, res) => {
 				return res.sendError(409, 'User data has been modified')
 			}
 			action = 'unFollowed'
-			await Friend.deleteOne({
-				$or: [
-					{ email1: fanEmail, email2: followedEmail },
-					{ email1: followedEmail, email2: fanEmail }
-				]
-			})
 		} else {
 			const newFan = await Fan.create({ fanEmail, followedEmail, fanDate: Date.now() })
 			if (!newFan) return res.sendError(409, 'Fan relationship already exists')
+			const mutualFan = await Fan.findOne({ fanEmail: followedEmail, followedEmail: fanEmail })
+			let updateFanOp = { $inc: { followNum: 1, version: 1 } }
+			let updateFollowedOp = { $inc: { fanNum: 1, version: 1 } }
+			if (mutualFan) {
+				updateFanOp.$inc.friendNum = 1
+				updateFollowedOp.$inc.friendNum = 1
+				await Friend.create({ email1: fanEmail, email2: followedEmail })
+			}
 			const [updatedFan, updatedFollowed] = await Promise.all([
-				User.findOneAndUpdate(
-					{ email: fanEmail, version: fan.version },
-					{ $inc: { followNum: 1, version: 1 } },
-					{ new: true }
-				),
+				User.findOneAndUpdate({ email: fanEmail, version: fan.version }, updateFanOp, {
+					new: true
+				}),
 				User.findOneAndUpdate(
 					{ email: followedEmail, version: followedUser.version },
-					{ $inc: { fanNum: 1, version: 1 } },
+					updateFollowedOp,
 					{ new: true }
 				)
 			])
 			if (!updatedFan || !updatedFollowed) {
-				await Fan.deleteOne({ fanEmail: newFan.email })
+				await Fan.deleteOne({ fanEmail, followedEmail })
+				if (mutualFan) await Friend.deleteOne({ email1: fanEmail, email2: followedEmail })
 				return res.sendError(409, 'User data has been modified')
 			}
 			action = 'followed'
-			const mutualFan = await Fan.findOne({
-				fanEmail: followedEmail,
-				fanEmail: followedEmail
-			})
-			if (mutualFan) {
-				await Friend.create({
-					email1: fanEmail,
-					email2: followedEmail
-				})
-				const [updatedFan, updatedFollowed] = await Promise.all([
-					User.findOneAndUpdate({ email: fanEmail }, { $inc: { friendNum: 1 } }, { new: true }),
-					User.findOneAndUpdate({ email: followedEmail }, { $inc: { friendNum: 1 } }, { new: true })
-				])
-				if (!updatedFan || !updatedFollowed) {
-					await Friend.deleteOne({ email1: fanEmail, email2: followedEmail })
-					throw new Error('Failed to update friendNum')
-				}
-			}
 		}
 		res.sendSuccess({ message: `Successfully ${action} user` })
 	} catch (error) {
-		await Fan.deleteOne({ fanEmail, followedEmail })
-		await User.findOneAndUpdate({ email: fanEmail }, { $inc: { followNum: -1 } })
-		await User.findOneAndUpdate({ email: followedEmail }, { $inc: { fanNum: -1 } })
 		console.error('Error in followUser:', error)
 		res.sendError(500, 'Internal server error')
 	}
@@ -342,12 +328,11 @@ const getOnesInfo = async (req, res) => {
 				relatedEmails = follows.map(follow => follow.followedEmail)
 				break
 			case 'friend':
-				const friends = await Friend.find({
-					$or: [{ email1: email }, { email2: email }]
-				}).lean()
-				relatedEmails = friends.map(friend =>
-					friend.email1 === email ? friend.email2 : friend.email1
-				)
+				const userFollows = await Fan.find({ fanEmail: email }).lean()
+				const userFollowsSet = new Set(userFollows.map(follow => follow.followedEmail))
+				const userFans = await Fan.find({ followedEmail: email }).lean()
+				const userFansSet = new Set(userFans.map(fan => fan.fanEmail))
+				relatedEmails = [...userFollowsSet].filter(followedEmail => userFansSet.has(followedEmail))
 				break
 		}
 		if (relatedEmails.length > 0) query = { email: { $in: relatedEmails } }

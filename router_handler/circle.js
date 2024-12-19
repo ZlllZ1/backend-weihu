@@ -52,128 +52,107 @@ const getCircles = async (req, res) => {
 	try {
 		const result = await Friend.aggregate([
 			{
-				$facet: {
-					friendCircles: [
+				$match: { $or: [{ email1: email }, { email2: email }] }
+			},
+			{
+				$project: {
+					friendEmail: {
+						$cond: { if: { $eq: ['$email1', email] }, then: '$email2', else: '$email1' }
+					}
+				}
+			},
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'friendEmail',
+					foreignField: 'email',
+					as: 'friendUser'
+				}
+			},
+			{ $unwind: '$friendUser' },
+			{
+				$lookup: {
+					from: 'settings',
+					localField: 'friendUser.setting',
+					foreignField: '_id',
+					as: 'friendUserSetting'
+				}
+			},
+			{ $unwind: '$friendUserSetting' },
+			{
+				$lookup: {
+					from: 'circles',
+					let: {
+						friendEmail: '$friendEmail',
+						friendCircleLimit: '$friendUserSetting.circleLimit'
+					},
+					pipeline: [
 						{
-							$match: { $or: [{ email1: email }, { email2: email }] }
-						},
-						{
-							$project: {
-								friendEmail: {
-									$cond: { if: { $eq: ['$email1', email] }, then: '$email2', else: '$email1' }
+							$match: {
+								$expr: {
+									$and: [
+										{ $eq: ['$email', '$$friendEmail'] },
+										{ $eq: ['$show', true] },
+										{
+											$or: [
+												{ $eq: ['$$friendCircleLimit', 0] },
+												{
+													$gte: [
+														'$publishDate',
+														{
+															$subtract: [
+																new Date(),
+																{
+																	$multiply: [
+																		{
+																			$switch: {
+																				branches: [
+																					{ case: { $eq: ['$$friendCircleLimit', 3] }, then: 3 },
+																					{ case: { $eq: ['$$friendCircleLimit', 7] }, then: 7 },
+																					{ case: { $eq: ['$$friendCircleLimit', 30] }, then: 30 },
+																					{
+																						case: { $eq: ['$$friendCircleLimit', 180] },
+																						then: 180
+																					},
+																					{ case: { $eq: ['$$friendCircleLimit', 365] }, then: 365 }
+																				],
+																				default: 0
+																			}
+																		},
+																		24 * 60 * 60 * 1000
+																	]
+																}
+															]
+														}
+													]
+												}
+											]
+										}
+									]
 								}
 							}
-						},
-						{
-							$lookup: {
-								from: 'users',
-								localField: 'friendEmail',
-								foreignField: 'email',
-								as: 'friendUser'
-							}
-						},
-						{ $unwind: '$friendUser' },
-						{
-							$lookup: {
-								from: 'settings',
-								localField: 'friendUser.setting',
-								foreignField: '_id',
-								as: 'friendUserSetting'
-							}
-						},
-						{ $unwind: '$friendUserSetting' },
-						{
-							$lookup: {
-								from: 'circles',
-								let: {
-									friendEmail: '$friendEmail',
-									friendCircleLimit: '$friendUserSetting.circleLimit'
-								},
-								pipeline: [
-									{
-										$match: {
-											$expr: {
-												$and: [
-													{ $eq: ['$email', '$$friendEmail'] },
-													{ $eq: ['$show', true] },
-													{
-														$or: [
-															{ $eq: ['$$friendCircleLimit', 0] },
-															{
-																$gte: [
-																	'$publishDate',
-																	{
-																		$subtract: [
-																			new Date(),
-																			{
-																				$multiply: [
-																					{
-																						$switch: {
-																							branches: [
-																								{
-																									case: { $eq: ['$$friendCircleLimit', 3] },
-																									then: 3
-																								},
-																								{
-																									case: { $eq: ['$$friendCircleLimit', 7] },
-																									then: 7
-																								},
-																								{
-																									case: { $eq: ['$$friendCircleLimit', 30] },
-																									then: 30
-																								},
-																								{
-																									case: { $eq: ['$$friendCircleLimit', 180] },
-																									then: 180
-																								},
-																								{
-																									case: { $eq: ['$$friendCircleLimit', 365] },
-																									then: 365
-																								}
-																							],
-																							default: 0
-																						}
-																					},
-																					24 * 60 * 60 * 1000
-																				]
-																			}
-																		]
-																	}
-																]
-															}
-														]
-													}
-												]
-											}
-										}
-									},
-									{ $sort: { publishDate: -1 } }
-								],
-								as: 'circles'
-							}
-						},
-						{ $unwind: '$circles' },
-						{ $replaceRoot: { newRoot: '$circles' } }
+						}
 					],
-					userCircles: [
-						{
-							$lookup: {
-								from: 'circles',
-								pipeline: [
-									{ $match: { email: email, show: true } },
-									{ $sort: { publishDate: -1 } }
-								],
-								as: 'userCircles'
-							}
-						},
-						{ $unwind: '$userCircles' },
-						{ $replaceRoot: { newRoot: '$userCircles' } }
-					]
+					as: 'friendCircles'
+				}
+			},
+			{ $unwind: '$friendCircles' },
+			{
+				$group: {
+					_id: null,
+					circles: { $push: '$friendCircles' }
+				}
+			},
+			{
+				$lookup: {
+					from: 'circles',
+					pipeline: [{ $match: { email: email, show: true } }],
+					as: 'userCircles'
 				}
 			},
 			{
 				$project: {
-					allCircles: { $concatArrays: ['$friendCircles', '$userCircles'] }
+					allCircles: { $concatArrays: ['$circles', '$userCircles'] }
 				}
 			},
 			{ $unwind: '$allCircles' },
@@ -411,8 +390,18 @@ const getPraiseUsers = async (req, res) => {
 	if (!email || !circleEmail || !circleId)
 		return res.sendError(400, 'email or circleEmail or circleId is required')
 	try {
-		const commonFriends = await getCommonFriends(email, circleEmail)
-		const praises = await PraiseCircle.find({ circleId }).lean()
+		let commonFriends = []
+		let praises = []
+		if (email === circleEmail) {
+			praises = await PraiseCircle.find({ circleId }).lean()
+		} else {
+			commonFriends = await getCommonFriends(email, circleEmail)
+			commonFriends.push(email, circleEmail)
+			praises = await PraiseCircle.find({
+				circleId,
+				email: { $in: commonFriends }
+			}).lean()
+		}
 		const userDetails = await User.find(
 			{ email: { $in: praises.map(p => p.email) } },
 			'email avatar'
@@ -422,13 +411,15 @@ const getPraiseUsers = async (req, res) => {
 			return {
 				...praise,
 				avatar: userDetail ? userDetail.avatar : null,
-				isCommonFriend: commonFriends.includes(praise.email)
+				isCommonFriend: commonFriends.includes(praise.email) || email === circleEmail
 			}
 		})
 		result.sort((a, b) => {
-			if (a.isCommonFriend === b.isCommonFriend)
-				return new Date(b.praiseDate) - new Date(a.praiseDate)
-			return b.isCommonFriend ? 1 : -1
+			if (a.email === email) return -1
+			if (b.email === email) return 1
+			if (a.email === circleEmail) return -1
+			if (b.email === circleEmail) return 1
+			return new Date(b.praiseDate) - new Date(a.praiseDate)
 		})
 		res.sendSuccess({ message: 'Praise users fetched successfully', praiseUsers: result })
 	} catch (error) {
@@ -602,7 +593,7 @@ const deleteComment = async (req, res) => {
 		if (!circle) return res.sendError(404, 'Circle not found')
 		const comment = await CircleComment.findOne({ circleId, _id: commentId })
 		if (!comment) return res.sendError(404, 'Comment not found')
-		if (circle.email !== email && comment.email !== email)
+		if (circle.email !== email && comment.user.email !== email)
 			return res.sendError(403, 'You are not authorized to delete this comment')
 		const commentsToDelete = await getCommentsToDelete(circleId, commentId)
 		const deleteResult = await CircleComment.deleteMany({ _id: { $in: commentsToDelete } })
