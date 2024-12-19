@@ -579,6 +579,16 @@ const deleteCircle = async (req, res) => {
 		const circle = await Circle.findOne({ circleId })
 		if (!circle) return res.sendError(404, 'Circle not found')
 		if (circle.email !== email) return res.sendError(403, 'You are not the owner of this circle')
+		const contentImageUrls = extractImageUrls(circle.content)
+		const allImageUrls = [...contentImageUrls]
+		for (const imageUrl of allImageUrls) {
+			try {
+				const ossPath = new URL(imageUrl).pathname.slice(1)
+				await OssClient.deleteFile(ossPath)
+			} catch (error) {
+				console.error(`Error deleting image ${imageUrl} from OSS:`, error)
+			}
+		}
 		await Circle.findOneAndDelete({ circleId })
 		await User.findOneAndUpdate({ email }, { $inc: { circleNum: -1 } })
 		await CircleComment.deleteMany({ circleId })

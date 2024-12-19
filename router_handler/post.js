@@ -660,6 +660,16 @@ const deletePost = async (req, res) => {
 		const post = await Post.findOne({ postId })
 		if (!post) return res.sendError(404, 'Post not found')
 		if (post.email !== email) return res.sendError(403, 'You are not the author of this post')
+		const contentImageUrls = extractImageUrls(post.content)
+		const allImageUrls = [post.coverUrl, ...contentImageUrls]
+		for (const imageUrl of allImageUrls) {
+			try {
+				const ossPath = new URL(imageUrl).pathname.slice(1)
+				await OssClient.deleteFile(ossPath)
+			} catch (error) {
+				console.error(`Error deleting image ${imageUrl} from OSS:`, error)
+			}
+		}
 		await User.findOneAndUpdate({ email }, { $inc: { postNum: -1 } })
 		await Post.findOneAndDelete({ postId })
 		await Comment.deleteMany({ postId })
