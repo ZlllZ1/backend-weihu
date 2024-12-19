@@ -726,6 +726,24 @@ const getCommentsToDelete = async (postId, commentId) => {
 	return commentsToDelete
 }
 
+const uploadPostImg = async (req, res) => {
+	const { email } = req
+	if (!email) return res.sendError(400, 'email is required')
+	try {
+		const user = await User.findOne({ email })
+		if (!user) return res.sendError(404, 'User not found')
+		const uniqueId = uuidv4()
+		const fileExt = path.extname(req.file.originalname)
+		const ossPath = `post/${uniqueId}${fileExt}`
+		const result = await OssClient.uploadFile(ossPath, req.file.path)
+		fs.unlinkSync(req.file.path)
+		res.sendSuccess({ message: 'postImg upload successfully', postImgUrl: result.url })
+	} catch (error) {
+		console.error('Error in uploadPostImg:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	uploadCover,
 	publishPost,
@@ -746,5 +764,6 @@ module.exports = {
 	deletePost,
 	hidePost,
 	showPost,
-	deleteComment
+	deleteComment,
+	uploadPostImg
 }
