@@ -7,7 +7,19 @@ const path = require('path')
 const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const CircleComment = require('../mongodb/circleComment')
-const moment = require('moment')
+const TempUpload = require('../mongodb/tempUpload.js')
+
+const extractImageUrls = content => {
+	const htmlImgRegex = /<img[^>]+src="?([^"\s]+)"?\s*\/?>/g
+	const markdownImgRegex = /!\[.*?\]\((.*?)\)/g
+	const urlRegex = /(https?:\/\/[^\s"']+\.(?:png|jpg|jpeg|gif|webp))/g
+	const urls = new Set()
+	let match
+	while ((match = htmlImgRegex.exec(content)) !== null) urls.add(match[1])
+	while ((match = markdownImgRegex.exec(content)) !== null) urls.add(match[1])
+	while ((match = urlRegex.exec(content)) !== null) urls.add(match[1])
+	return Array.from(urls)
+}
 
 const publishCircle = async (req, res) => {
 	const { email, content, delta } = req.body
@@ -36,6 +48,9 @@ const publishCircle = async (req, res) => {
 			await Circle.findByIdAndDelete(circle._id)
 			return res.sendError(409, 'User data has been modified')
 		}
+		const contentImageUrls = extractImageUrls(content)
+		const allImageUrls = [...contentImageUrls]
+		await confirmPostImages(email, allImageUrls)
 		res.sendSuccess({ message: 'Circle published successfully', circleId: circle.circleId })
 	} catch (error) {
 		console.error('Error in publishCircle:', error)
@@ -297,6 +312,21 @@ const praiseCircle = async (req, res) => {
 	}
 }
 
+const confirmPostImages = async (email, usedImageUrls) => {
+	try {
+		const tempUploads = await TempUpload.find({ email })
+		for (const upload of tempUploads) {
+			if (usedImageUrls.includes(upload.url)) await TempUpload.deleteOne({ _id: upload._id })
+			else {
+				await OssClient.deleteFile(upload.ossPath)
+				await TempUpload.deleteOne({ _id: upload._id })
+			}
+		}
+	} catch (error) {
+		console.error('Error in confirmPostImages:', error)
+	}
+}
+
 const uploadCircleImg = async (req, res) => {
 	const { email } = req
 	if (!email) return res.sendError(400, 'email is required')
@@ -308,6 +338,12 @@ const uploadCircleImg = async (req, res) => {
 		const ossPath = `circle/${uniqueId}${fileExt}`
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
 		fs.unlinkSync(req.file.path)
+		await TempUpload.create({
+			email,
+			ossPath,
+			url: result.url,
+			createdAt: new Date()
+		})
 		res.sendSuccess({ message: 'circleImg upload successfully', circleImgUrl: result.url })
 	} catch (error) {
 		console.error('Error in uploadCircleImg:', error)

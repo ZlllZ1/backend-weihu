@@ -12,6 +12,7 @@ const { Fan, Friend } = require('../mongodb/fan.js')
 const Comment = require('../mongodb/comment.js')
 const PraiseComment = require('../mongodb/praiseComment.js')
 const { v4: uuidv4 } = require('uuid')
+const TempUpload = require('../mongodb/tempUpload.js')
 
 const uploadCover = async (req, res) => {
 	const { account } = req.body
@@ -24,6 +25,12 @@ const uploadCover = async (req, res) => {
 		const ossPath = `cover/${uniqueId}${fileExt}`
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
 		fs.unlinkSync(req.file.path)
+		await TempUpload.create({
+			email,
+			ossPath,
+			url: result.url,
+			createdAt: new Date()
+		})
 		res.sendSuccess({ message: 'Cover upload successfully', coverUrl: result.url })
 	} catch (error) {
 		console.error('Error in uploadCover:', error)
@@ -31,6 +38,17 @@ const uploadCover = async (req, res) => {
 	}
 }
 
+const extractImageUrls = content => {
+	const htmlImgRegex = /<img[^>]+src="?([^"\s]+)"?\s*\/?>/g
+	const markdownImgRegex = /!\[.*?\]\((.*?)\)/g
+	const urlRegex = /(https?:\/\/[^\s"']+\.(?:png|jpg|jpeg|gif|webp))/g
+	const urls = new Set()
+	let match
+	while ((match = htmlImgRegex.exec(content)) !== null) urls.add(match[1])
+	while ((match = markdownImgRegex.exec(content)) !== null) urls.add(match[1])
+	while ((match = urlRegex.exec(content)) !== null) urls.add(match[1])
+	return Array.from(urls)
+}
 const publishPost = async (req, res) => {
 	const { email, title, coverUrl, content, introduction, delta, type } = req.body
 	if (!email || !title || !coverUrl || !content || !introduction || !delta)
@@ -69,6 +87,9 @@ const publishPost = async (req, res) => {
 			await Post.deleteOne({ email })
 			return res.sendError(409, 'User data has been modified')
 		}
+		const contentImageUrls = extractImageUrls(content)
+		const allImageUrls = [coverUrl, ...contentImageUrls]
+		await confirmPostImages(email, allImageUrls)
 		res.sendSuccess({ message: 'Post published successfully', postId: post.postId })
 	} catch (error) {
 		console.error('Error in publishPost:', error)
@@ -519,37 +540,30 @@ const organizeCommentsAfterNew = (comments, newCommentId) => {
 	const otherComments = comments.filter(c => c._id.toString() !== newCommentId.toString())
 	const rootComments = otherComments.filter(c => !c.parentId)
 	const childComments = otherComments.filter(c => c.parentId)
-
 	const repliesMap = new Map()
 	childComments.forEach(comment => {
 		const rootParentId = findRootParentId(comment, otherComments)
 		if (!repliesMap.has(rootParentId)) repliesMap.set(rootParentId, [])
 		repliesMap.get(rootParentId).push(comment)
 	})
-
 	function findRootParentId(comment, allComments) {
 		if (!comment.parentId) return comment._id.toString()
 		const parent = allComments.find(c => c._id.toString() === comment.parentId)
 		return parent ? findRootParentId(parent, allComments) : comment.parentId
 	}
-
 	if (newComment) {
 		const rootParentId = findRootParentId(newComment, otherComments)
 		if (rootParentId !== newComment._id.toString()) {
 			if (!repliesMap.has(rootParentId)) repliesMap.set(rootParentId, [])
 			repliesMap.get(rootParentId).unshift(newComment)
-		} else {
-			rootComments.unshift(newComment)
-		}
+		} else rootComments.unshift(newComment)
 	}
-
 	rootComments.forEach(comment => {
 		comment.replies = (repliesMap.get(comment._id.toString()) || []).sort((a, b) => {
 			if (a.rate !== b.rate) return b.rate > a.rate
 			return b.commentDate >= a.commentDate
 		})
 	})
-
 	return rootComments
 }
 
@@ -726,6 +740,21 @@ const getCommentsToDelete = async (postId, commentId) => {
 	return commentsToDelete
 }
 
+const confirmPostImages = async (email, usedImageUrls) => {
+	try {
+		const tempUploads = await TempUpload.find({ email })
+		for (const upload of tempUploads) {
+			if (usedImageUrls.includes(upload.url)) await TempUpload.deleteOne({ _id: upload._id })
+			else {
+				await OssClient.deleteFile(upload.ossPath)
+				await TempUpload.deleteOne({ _id: upload._id })
+			}
+		}
+	} catch (error) {
+		console.error('Error in confirmPostImages:', error)
+	}
+}
+
 const uploadPostImg = async (req, res) => {
 	const { email } = req
 	if (!email) return res.sendError(400, 'email is required')
@@ -737,6 +766,12 @@ const uploadPostImg = async (req, res) => {
 		const ossPath = `post/${uniqueId}${fileExt}`
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
 		fs.unlinkSync(req.file.path)
+		await TempUpload.create({
+			email,
+			ossPath,
+			url: result.url,
+			createdAt: new Date()
+		})
 		res.sendSuccess({ message: 'postImg upload successfully', postImgUrl: result.url })
 	} catch (error) {
 		console.error('Error in uploadPostImg:', error)
