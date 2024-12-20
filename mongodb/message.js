@@ -2,9 +2,8 @@ const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
 const messageSchema = new Schema({
-	messageId: String,
 	chatId: String,
-	userId: String,
+	email: String,
 	content: String,
 	sendDate: { type: Date, default: Date.now }
 })
