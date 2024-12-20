@@ -12,11 +12,13 @@ const ossClient = require('../utils/ossClient.js')
 
 const extractImageUrls = content => {
 	const htmlImgRegex = /<img[^>]+src="?([^"\s]+)"?\s*\/?>/g
+	const htmlVideoRegex = /<video[^>]+src="?([^"\s]+)"?[^>]*>/g
 	const markdownImgRegex = /!\[.*?\]\((.*?)\)/g
 	const urlRegex = /(https?:\/\/[^\s"']+\.(?:png|jpg|jpeg|gif|webp))/g
 	const urls = new Set()
 	let match
 	while ((match = htmlImgRegex.exec(content)) !== null) urls.add(match[1])
+	while ((match = htmlVideoRegex.exec(content)) !== null) urls.add(match[1])
 	while ((match = markdownImgRegex.exec(content)) !== null) urls.add(match[1])
 	while ((match = urlRegex.exec(content)) !== null) urls.add(match[1])
 	return Array.from(urls)
@@ -251,10 +253,20 @@ const confirmPostImages = async (email, usedImageUrls) => {
 	try {
 		const tempUploads = await TempUpload.find({ email })
 		for (const upload of tempUploads) {
-			if (usedImageUrls.includes(upload.url)) await TempUpload.deleteOne({ _id: upload._id })
-			else {
-				await OssClient.deleteFile(upload.ossPath)
-				await TempUpload.deleteOne({ _id: upload._id })
+			const httpsUrl = upload.url.replace(/^http:/, 'https:')
+			const isVideo = upload.url.includes('/videos/')
+			if (isVideo) {
+				if (usedImageUrls.includes(httpsUrl)) await TempUpload.deleteOne({ _id: upload._id })
+				else {
+					await OssClient.deleteFile(upload.ossPath)
+					await TempUpload.deleteOne({ _id: upload._id })
+				}
+			} else {
+				if (usedImageUrls.includes(upload.url)) await TempUpload.deleteOne({ _id: upload._id })
+				else {
+					await OssClient.deleteFile(upload.ossPath)
+					await TempUpload.deleteOne({ _id: upload._id })
+				}
 			}
 		}
 	} catch (error) {
