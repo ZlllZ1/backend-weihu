@@ -28,4 +28,8 @@ router.post('/showCircle', circleHandler.showCircle)
 
 router.post('/deleteComment', circleHandler.deleteComment)
 
+router.post('/uploadChunk', upload.single('chunk'), circleHandler.uploadChunk)
+
+router.post('/mergeChunks', circleHandler.mergeChunks)
+
 module.exports = router

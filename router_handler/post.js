@@ -26,7 +26,7 @@ const uploadCover = async (req, res) => {
 		const result = await OssClient.uploadFile(ossPath, req.file.path)
 		fs.unlinkSync(req.file.path)
 		await TempUpload.create({
-			email,
+			account,
 			ossPath,
 			url: result.url,
 			createdAt: new Date()

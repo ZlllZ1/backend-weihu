@@ -8,6 +8,7 @@ const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const CircleComment = require('../mongodb/circleComment')
 const TempUpload = require('../mongodb/tempUpload.js')
+const ossClient = require('../utils/ossClient.js')
 
 const extractImageUrls = content => {
 	const htmlImgRegex = /<img[^>]+src="?([^"\s]+)"?\s*\/?>/g
@@ -65,7 +66,8 @@ const getCircles = async (req, res) => {
 	const skip = (page - 1) * limit
 	if (!email) return res.sendError(400, 'email is required')
 	try {
-		const result = await Friend.aggregate([
+		const userCircles = await Circle.find({ email: email, show: true }).lean()
+		const friendCircles = await Friend.aggregate([
 			{
 				$match: { $or: [{ email1: email }, { email2: email }] }
 			},
@@ -153,118 +155,51 @@ const getCircles = async (req, res) => {
 			},
 			{ $unwind: '$friendCircles' },
 			{
-				$group: {
-					_id: null,
-					circles: { $push: '$friendCircles' }
-				}
-			},
-			{
-				$lookup: {
-					from: 'circles',
-					pipeline: [{ $match: { email: email, show: true } }],
-					as: 'userCircles'
-				}
-			},
-			{
-				$project: {
-					allCircles: { $concatArrays: ['$circles', '$userCircles'] }
-				}
-			},
-			{ $unwind: '$allCircles' },
-			{ $sort: { 'allCircles.publishDate': -1 } },
-			{ $skip: skip },
-			{ $limit: limit },
-			{
-				$lookup: {
-					from: 'praisecircles',
-					let: { circleId: '$allCircles.circleId', circleEmail: '$allCircles.email' },
-					pipeline: [
-						{
-							$match: {
-								$expr: {
-									$and: [
-										{ $eq: ['$circleId', '$$circleId'] },
-										{
-											$or: [
-												{ $eq: ['$email', email] },
-												{ $eq: ['$email', '$$circleEmail'] },
-												{
-													$and: [
-														{
-															$in: [
-																'$email',
-																{ $literal: await getCommonFriends(email, '$$circleEmail') }
-															]
-														},
-														{ $ne: ['$email', email] },
-														{ $ne: ['$email', '$$circleEmail'] }
-													]
-												}
-											]
-										}
-									]
-								}
-							}
-						}
-					],
-					as: 'praises'
-				}
-			},
-			{
-				$lookup: {
-					from: 'circlecomments',
-					let: { circleId: '$allCircles.circleId', circleEmail: '$allCircles.email' },
-					pipeline: [
-						{
-							$match: {
-								$expr: {
-									$and: [
-										{ $eq: ['$circleId', '$$circleId'] },
-										{
-											$or: [
-												{ $eq: ['$user.email', email] },
-												{ $eq: ['$user.email', '$$circleEmail'] },
-												{
-													$and: [
-														{
-															$in: [
-																'$user.email',
-																{ $literal: await getCommonFriends(email, '$$circleEmail') }
-															]
-														},
-														{ $ne: ['$user.email', email] },
-														{ $ne: ['$user.email', '$$circleEmail'] }
-													]
-												}
-											]
-										}
-									]
-								}
-							}
-						}
-					],
-					as: 'comments'
-				}
-			},
-			{
-				$addFields: {
-					'allCircles.isPraise': {
-						$in: [email, '$praises.email']
-					},
-					'allCircles.praiseNum': { $size: '$praises' },
-					'allCircles.commentNum': { $size: '$comments' }
-				}
-			},
-			{
-				$group: {
-					_id: null,
-					circles: { $push: '$allCircles' },
-					total: { $sum: 1 }
-				}
+				$replaceRoot: { newRoot: '$friendCircles' }
 			}
 		])
-		const { circles, total } = result[0] || { circles: [], total: 0 }
-		res.sendSuccess({ message: 'Circles fetched successfully', circles, total })
+		const allCircles = [...userCircles, ...friendCircles]
+		allCircles.sort((a, b) => b.publishDate - a.publishDate)
+		const paginatedCircles = allCircles.slice(skip, skip + limit)
+		const circlesWithDetails = await Promise.all(
+			paginatedCircles.map(async circle => {
+				const praises = await PraiseCircle.find({ circleId: circle.circleId })
+				const comments = await CircleComment.find({ circleId: circle.circleId })
+				const commonFriends = await getCommonFriends(email, circle.email)
+				let visiblePraises, visibleComments, praiseNum, commentNum
+				if (email === circle.email) {
+					visiblePraises = praises
+					visibleComments = comments
+					praiseNum = praises.length
+					commentNum = comments.length
+				} else {
+					visiblePraises = praises.filter(
+						p => p.email === email || p.email === circle.email || commonFriends.includes(p.email)
+					)
+					visibleComments = comments.filter(
+						c =>
+							c.user.email === email ||
+							c.user.email === circle.email ||
+							commonFriends.includes(c.user.email)
+					)
+					praiseNum = visiblePraises.length
+					commentNum = visibleComments.length
+				}
+				return {
+					...circle,
+					isPraise: praises.some(p => p.email === email),
+					praiseNum,
+					commentNum,
+					praises: visiblePraises,
+					comments: visibleComments
+				}
+			})
+		)
+		res.sendSuccess({
+			message: 'Circles fetched successfully',
+			circles: circlesWithDetails,
+			total: allCircles.length
+		})
 	} catch (error) {
 		console.error('Error in getCircles:', error)
 		res.sendError(500, 'Internal server error')
@@ -662,6 +597,80 @@ const getCommentsToDelete = async (circleId, commentId) => {
 	return commentsToDelete
 }
 
+const uploadChunk = async (req, res) => {
+	const { chunkIndex, totalChunks, fileName, fileMD5, email } = req.body
+	const chunk = req.file
+	if (!chunk) return res.status(400).json({ message: 'No chunk uploaded' })
+	const chunkDir = path.join(__dirname, 'uploads', fileMD5)
+	if (!fs.existsSync(chunkDir)) fs.mkdirSync(chunkDir, { recursive: true })
+	const chunkPath = path.join(chunkDir, `chunk-${chunkIndex}`)
+	fs.renameSync(chunk.path, chunkPath)
+	res.sendSuccess({ message: 'Chunk uploaded successfully' })
+}
+
+const mergeChunks = (req, res) => {
+	const { fileName, fileMD5, email } = req.body
+	const chunkDir = path.join(__dirname, 'uploads', fileMD5)
+	const outputPath = path.join(__dirname, 'uploads', `${fileMD5}-${fileName}`)
+	fs.readdir(chunkDir, (err, files) => {
+		if (err) {
+			console.error('Error reading directory:', err)
+			return res.sendError(500, 'Error reading directory', err.message)
+		}
+		files.sort((a, b) => Number(a.split('-')[1]) - Number(b.split('-')[1]))
+		const writeStream = fs.createWriteStream(outputPath)
+		const mergeFile = index => {
+			if (index >= files.length) {
+				writeStream.end()
+				writeStream.on('finish', () => {
+					const ossPath = `videos/${fileMD5}-${fileName}`
+					ossClient
+						.uploadFile(ossPath, outputPath)
+						.then(async result => {
+							fs.unlink(outputPath, err => {
+								if (err) console.error('Error deleting merged file:', err)
+							})
+							fs.rm(chunkDir, { recursive: true }, err => {
+								if (err) console.error('Error removing chunk directory:', err)
+							})
+							await TempUpload.create({
+								email,
+								ossPath,
+								url: result.url,
+								createdAt: new Date()
+							})
+							res.sendSuccess({
+								message: 'Chunks merged and uploaded successfully',
+								data: {
+									videoUrl: result.url
+								}
+							})
+						})
+						.catch(error => {
+							console.error('Error uploading file to OSS:', error)
+							res.sendError(500, 'Error uploading file to OSS', error.message)
+						})
+				})
+				return
+			}
+			const chunkPath = path.join(chunkDir, files[index])
+			const readStream = fs.createReadStream(chunkPath)
+			readStream.pipe(writeStream, { end: false })
+			readStream.on('end', () => {
+				fs.unlink(chunkPath, err => {
+					if (err) console.error('Error deleting chunk file:', err)
+					mergeFile(index + 1)
+				})
+			})
+			readStream.on('error', error => {
+				console.error('Error reading chunk file:', error)
+				res.sendError(500, 'Error merging chunks', error.message)
+			})
+		}
+		mergeFile(0)
+	})
+}
+
 module.exports = {
 	publishCircle,
 	getCircles,
@@ -674,5 +683,7 @@ module.exports = {
 	deleteCircle,
 	hideCircle,
 	showCircle,
-	deleteComment
+	deleteComment,
+	uploadChunk,
+	mergeChunks
 }

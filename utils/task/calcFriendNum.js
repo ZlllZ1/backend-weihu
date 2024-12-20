@@ -25,7 +25,7 @@ const syncFriendCount = async () => {
 			updateOne: {
 				filter: { email: user.email },
 				update: {
-					$set: { friendNum: friendCountMap.get(user.email) || 0 }
+					$set: { friendNum: friendCountMap.get(user.email) - 1 || 0 }
 				}
 			}
 		}))
