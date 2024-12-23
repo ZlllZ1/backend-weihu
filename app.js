@@ -1,17 +1,21 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
+const http = require('http')
 const { connectDb } = require('./mongodb/index.js')
 const verifyToken = require('./utils/verifyToken.js')
 const apiResponseMiddleware = require('./utils/apiResponseMiddleware.js')
+const UserWebSocketManager = require('./utils/userWebsocketManager.js')
 const userRouter = require('./router/user')
 const loginRouter = require('./router/login')
 const settingRouter = require('./router/setting')
 const postRouter = require('./router/post')
 const circleRouter = require('./router/circle')
+const chatRouter = require('./router/chat')
 const otherRouter = require('./router/other')
 
 const app = express()
+const server = http.createServer(app)
 
 app.set('trust proxy', true)
 app.use(cors())
@@ -24,12 +28,15 @@ app.use('/user', verifyToken, userRouter)
 app.use('/setting', verifyToken, settingRouter)
 app.use('/post', verifyToken, postRouter)
 app.use('/circle', verifyToken, circleRouter)
+app.use('/chat', verifyToken, chatRouter)
 app.use('/other', otherRouter)
+
+UserWebSocketManager.initialize(server)
 
 const startServer = async () => {
 	try {
 		await connectDb()
-		app.listen(3007, () => {
+		server.listen(3007, () => {
 			console.log('启动服务器 http://127.0.0.1:3007')
 		})
 	} catch (error) {

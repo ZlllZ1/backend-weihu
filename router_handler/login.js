@@ -1,6 +1,7 @@
 const AuthCode = require('../mongodb/authCode.js')
 const Setting = require('../mongodb/setting.js')
 const User = require('../mongodb/user.js')
+const UserWebSocketManager = require('../utils/userWebsocketManager.js')
 
 const { generateEmailCode, createEmailContent, send163 } = require('../utils/sendEmail.js')
 const bcrypt = require('bcrypt')
@@ -100,7 +101,11 @@ const codeLogin = async (req, res) => {
 		const refreshToken = generateRefreshToken(user)
 		user.refreshToken = refreshToken
 		await Promise.all([user.save(), setting.save(), AuthCode.deleteMany({ email: account })])
-		return res.sendSuccess({ token, refreshToken }, 'Register/Login success')
+		const wsConnectionInfo = {
+			userId: user._id.toString(),
+			token: token
+		}
+		return res.sendSuccess({ token, refreshToken, wsConnectionInfo }, 'Register/Login success')
 	} catch (error) {
 		console.error(error)
 		return res.sendError(500, 'Server error')

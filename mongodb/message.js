@@ -2,11 +2,14 @@ const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
 const messageSchema = new Schema({
-	chatId: String,
-	email: String,
-	content: String,
-	sendDate: { type: Date, default: Date.now }
+	chatId: { type: String, required: true },
+	sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+	content: { type: String, required: true },
+	timestamp: { type: Date, default: Date.now },
+	isRead: { type: Boolean, default: false }
 })
+
+messageSchema.index({ chatId: 1, timestamp: -1 })
 
 const Message = mongoose.model('Message', messageSchema)
 

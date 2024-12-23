@@ -4,6 +4,7 @@ const OssClient = require('../utils/ossClient.js')
 const fs = require('fs')
 const path = require('path')
 const { Fan, Friend } = require('../mongodb/fan.js')
+const Chat = require('../mongodb/chat.js')
 
 const getUserInfo = async (req, res) => {
 	const { account } = req.query
@@ -232,8 +233,7 @@ const followUser = async (req, res) => {
 			User.findOne({ email: fanEmail }),
 			User.findOne({ email: followedEmail })
 		])
-		if (!fan) return res.sendError(404, 'Fan user not found')
-		if (!followedUser) return res.sendError(404, 'Followed user not found')
+		if (!fan || !followedUser) return res.sendError(404, 'Fan user or followed user not found')
 		const existingFan = await Fan.findOne({ fanEmail, followedEmail })
 		let action
 		if (existingFan) {
@@ -282,6 +282,7 @@ const followUser = async (req, res) => {
 				updateFanOp.$inc.friendNum = 1
 				updateFollowedOp.$inc.friendNum = 1
 				await Friend.create({ email1: fanEmail, email2: followedEmail })
+				await getOrCreateChat(fan, followedUser)
 			}
 			const [updatedFan, updatedFollowed] = await Promise.all([
 				User.findOneAndUpdate({ email: fanEmail, version: fan.version }, updateFanOp, {
@@ -305,6 +306,26 @@ const followUser = async (req, res) => {
 		console.error('Error in followUser:', error)
 		res.sendError(500, 'Internal server error')
 	}
+}
+const getOrCreateChat = async (user1, user2) => {
+	const chatId = [user1.email.toString(), user2.email.toString()].sort().join('_')
+	let chat = await Chat.findOne({ chatId })
+	if (!chat) {
+		chat = new Chat({
+			chatId,
+			participants: [
+				{ email: user1.email, unreadCount: 0, nickname: user1.nickname, avatar: user1.avatar },
+				{ email: user2.email, unreadCount: 0, nickname: user2.nickname, avatar: user2.avatar }
+			],
+			lastMessage: {
+				content: '',
+				senderEmail: null,
+				timestamp: null
+			}
+		})
+		await chat.save()
+	}
+	return chat
 }
 
 const getOnesInfo = async (req, res) => {
