@@ -593,8 +593,16 @@ const getComments = async (req, res) => {
 			email: email
 		}).lean()
 		const userPraiseSet = new Set(userPraises.map(praise => praise.commentId.toString()))
+		const praiseCounts = await PraiseComment.aggregate([
+			{ $match: { commentId: { $in: allCommentIds } } },
+			{ $group: { _id: '$commentId', count: { $sum: 1 } } }
+		])
+		const praiseCountMap = new Map(
+			praiseCounts.map(praise => [praise._id.toString(), praise.count])
+		)
 		const addPraiseInfo = comment => {
 			comment.isPraise = userPraiseSet.has(comment._id.toString())
+			comment.praiseNum = praiseCountMap.get(comment._id.toString()) || 0
 			if (comment.replies) comment.replies.forEach(addPraiseInfo)
 			return comment
 		}
