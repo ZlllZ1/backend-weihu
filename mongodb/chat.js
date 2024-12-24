@@ -14,7 +14,7 @@ const chatSchema = new Schema(
 		],
 		lastMessage: {
 			content: { type: String, default: '' },
-			senderId: { type: String, ref: 'User' },
+			senderEmail: { type: String, ref: 'User' },
 			timestamp: { type: Date, default: Date.now }
 		},
 		createdAt: { type: Date, default: Date.now },

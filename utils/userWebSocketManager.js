@@ -61,11 +61,8 @@ class UserWebSocketManager {
 
 	sendToUser(email, message) {
 		const connection = this.connections.get(email)
-		if (connection && connection.readyState === WebSocket.OPEN) {
+		if (connection && connection.readyState === WebSocket.OPEN)
 			connection.send(JSON.stringify(message))
-		} else {
-			console.log(`User ${email} is not connected`)
-		}
 	}
 
 	broadcastToAll(message, excludeUserId = null) {

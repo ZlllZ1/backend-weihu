@@ -364,7 +364,7 @@ const getOnesInfo = async (req, res) => {
 				avatar: 1,
 				_id: 0,
 				introduction: 1,
-				token: 1,
+				refreshToken: 1,
 				lastLoginDate: 1,
 				sex: 1
 			})

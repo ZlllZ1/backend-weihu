@@ -3,13 +3,17 @@ const Schema = mongoose.Schema
 
 const notificationSchema = new Schema(
 	{
-		recipient: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+		recipient: { type: String, ref: 'User', required: true },
 		type: { type: String, required: true, enum: ['like', 'comment', 'follow', 'message'] },
-		sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+		senderEmail: { type: String, required: true },
 		content: { type: String, required: true },
 		relatedItem: {
-			itemType: { type: String, required: true, enum: ['post', 'comment', 'user'] },
-			itemId: { type: Schema.Types.ObjectId, required: true }
+			itemType: {
+				type: String,
+				required: true,
+				enum: ['chat', 'praise', 'comment', 'follow', 'collect']
+			},
+			itemId: { type: String, required: true }
 		},
 		isRead: { type: Boolean, default: false },
 		createdAt: { type: Date, default: Date.now }

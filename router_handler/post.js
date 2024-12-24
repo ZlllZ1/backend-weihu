@@ -177,6 +177,16 @@ const getPosts = async (req, res) => {
 				.limit(limit)
 				.lean()
 			total = await Post.countDocuments(query)
+			const follows = await Fan.find({ fanEmail: email }).lean()
+			const followedEmails = new Set(follows.map(f => f.followedEmail))
+			posts = posts.map(post => ({
+				...post,
+				user: {
+					...post,
+					...post.user,
+					isFollowing: followedEmails.has(post.email)
+				}
+			}))
 		}
 		const postIds = posts.map(post => post.postId)
 		const [praises, collects] = await Promise.all([
