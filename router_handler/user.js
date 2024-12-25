@@ -5,6 +5,7 @@ const fs = require('fs')
 const path = require('path')
 const { Fan, Friend } = require('../mongodb/fan.js')
 const Chat = require('../mongodb/chat.js')
+const Notification = require('../mongodb/notification.js')
 
 const getUserInfo = async (req, res) => {
 	const { account } = req.query
@@ -301,6 +302,23 @@ const followUser = async (req, res) => {
 			}
 			action = 'followed'
 		}
+		const newNotification = new Notification({
+			recipient: followedUser._id,
+			type: 'follow_user',
+			sender: {
+				email: fan.email,
+				nickname: fan.nickname,
+				avatar: fan.avatar
+			},
+			content: '关注了你',
+			relatedItem: {
+				itemType: 'user',
+				itemId: followedUser.email
+			},
+			isRead: false,
+			createdAt: new Date()
+		})
+		await newNotification.save()
 		res.sendSuccess({ message: `Successfully ${action} user` })
 	} catch (error) {
 		console.error('Error in followUser:', error)

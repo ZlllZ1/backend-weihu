@@ -9,6 +9,7 @@ const fs = require('fs')
 const CircleComment = require('../mongodb/circleComment')
 const TempUpload = require('../mongodb/tempUpload.js')
 const ossClient = require('../utils/ossClient.js')
+const Notification = require('../mongodb/notification')
 
 const extractImageUrls = content => {
 	const htmlImgRegex = /<img[^>]+src="?([^"\s]+)"?\s*\/?>/g
@@ -36,7 +37,8 @@ const publishCircle = async (req, res) => {
 			user: {
 				email: user.email,
 				nickname: user.nickname,
-				avatar: user.avatar
+				avatar: user.avatar,
+				_id: user._id
 			},
 			delta,
 			publishDate: new Date()
@@ -240,6 +242,30 @@ const praiseCircle = async (req, res) => {
 				praiseDate: Date.now()
 			})
 			await newPraise.save()
+			if (circle.user.email !== user.email) {
+				const newNotification = new Notification({
+					recipient: circle.user._id,
+					type: 'praise_circle',
+					sender: {
+						email: user.email,
+						nickname: user.nickname,
+						avatar: user.avatar
+					},
+					content: '赞了你的朋友圈',
+					relatedItem: {
+						itemType: 'circle',
+						itemId: circle.circleId,
+						detail: {
+							content: circle.content,
+							circleId: circle.circleId,
+							author: circle.user
+						}
+					},
+					isRead: false,
+					createdAt: new Date()
+				})
+				await newNotification.save()
+			}
 			await Circle.updateOne({ circleId: circle.circleId }, { $inc: { praiseNum: 1 } })
 			return res.sendSuccess({ message: 'Praise successfully' })
 		}
@@ -318,6 +344,52 @@ const commentCircle = async (req, res) => {
 		circle.commentNum = circle.commentNum + 1
 		await circle.save()
 		await newCircleComment.save()
+		const user = await User.findOne({ email })
+		if (circle.user.email !== email) {
+			const newNotification = new Notification({
+				recipient: circle.user._id,
+				type: 'comment_circle',
+				sender: {
+					email: email,
+					nickname: user.nickname,
+					avatar: user.avatar
+				},
+				content: '评论了你的朋友圈',
+				relatedItem: {
+					itemType: 'circle',
+					itemId: circle.circleId,
+					detail: {
+						content: content
+					}
+				},
+				isRead: false,
+				createdAt: new Date()
+			})
+			await newNotification.save()
+		}
+		if (parentId && parentEmail !== email) {
+			const parentUser = await User.findOne({ email: parentEmail })
+			const parentNotification = new Notification({
+				recipient: parentUser._id,
+				type: 'comment_comment',
+				sender: {
+					email: email,
+					nickname: user.nickname,
+					avatar: user.avatar
+				},
+				content: '回复了你的评论',
+				relatedItem: {
+					itemType: 'comment',
+					itemId: parentEmail,
+					detail: {
+						content: content
+					}
+				},
+				isRead: false,
+				createdAt: new Date()
+			})
+			await parentNotification.save()
+		}
 		res.sendSuccess({ message: 'Comment successfully', commentId: newCircleComment._id.toString() })
 	} catch (error) {
 		console.error('Error in comment:', error)

@@ -13,6 +13,7 @@ const Comment = require('../mongodb/comment.js')
 const PraiseComment = require('../mongodb/praiseComment.js')
 const { v4: uuidv4 } = require('uuid')
 const TempUpload = require('../mongodb/tempUpload.js')
+const Notification = require('../mongodb/notification.js')
 
 const uploadCover = async (req, res) => {
 	const { account } = req.body
@@ -64,7 +65,8 @@ const publishPost = async (req, res) => {
 			nickname: user.nickname,
 			live: user.live,
 			avatar: user.avatar,
-			introduction: user.introduction
+			introduction: user.introduction,
+			_id: user._id
 		}
 		const postData = {
 			email,
@@ -395,6 +397,31 @@ const praisePost = async (req, res) => {
 				Post.updateOne({ postId: post.postId }, { $inc: { praiseNum: 1 } }),
 				User.updateOne({ email: user.email }, { $inc: { praiseNum: 1 } })
 			])
+			if (post.user.email !== user.email) {
+				const newNotification = new Notification({
+					recipient: post.user._id,
+					type: 'praise_post',
+					sender: {
+						email: user.email,
+						nickname: user.nickname,
+						avatar: user.avatar
+					},
+					content: '点赞了你的帖子',
+					relatedItem: {
+						itemType: 'post',
+						itemId: post.postId,
+						detail: {
+							title: post.title,
+							coverUrl: post.coverUrl,
+							content: post.content,
+							author: post.user
+						}
+					},
+					isRead: false,
+					createdAt: new Date()
+				})
+				await newNotification.save()
+			}
 			return res.sendSuccess({ message: 'Praise successfully' })
 		}
 	} catch (error) {
@@ -430,6 +457,31 @@ const collectPost = async (req, res) => {
 				Post.updateOne({ postId: post.postId }, { $inc: { collectNum: 1 } }),
 				User.updateOne({ email: user.email }, { $inc: { collectNum: 1 } })
 			])
+			if (post.user.email !== user.email) {
+				const newNotification = new Notification({
+					recipient: post.user._id,
+					type: 'collect_post',
+					sender: {
+						email: user.email,
+						nickname: user.nickname,
+						avatar: user.avatar
+					},
+					content: '收藏了你的帖子',
+					relatedItem: {
+						itemType: 'post',
+						itemId: post.postId,
+						detail: {
+							title: post.title,
+							coverUrl: post.coverUrl,
+							content: post.content,
+							author: post.user
+						}
+					},
+					isRead: false,
+					createdAt: new Date()
+				})
+				await newNotification.save()
+			}
 			return res.sendSuccess({ message: 'Collect successfully' })
 		}
 	} catch (error) {
@@ -515,6 +567,7 @@ const comment = async (req, res) => {
 		return res.sendError(400, 'email or postId or content is required')
 	try {
 		const post = await Post.findOne({ postId })
+		const user = await User.findOne({ email })
 		const newComment = new Comment({
 			postEmail,
 			postId,
@@ -534,8 +587,60 @@ const comment = async (req, res) => {
 			parentComment.commentNum = parentComment.commentNum + 1
 			parentComment.rate = parentComment.rate + 2
 			await parentComment.save()
+			const parentUser = await User.findOne({ email: parentEmail })
+			if (parentUser.email !== email) {
+				const parentNotification = new Notification({
+					recipient: parentUser._id,
+					type: 'comment_comment',
+					sender: {
+						email: email,
+						nickname: user.nickname,
+						avatar: user.avatar
+					},
+					content: '回复了你的评论',
+					relatedItem: {
+						itemType: 'comment',
+						itemId: parentEmail,
+						detail: {
+							postId: post.postId,
+							myContent: parentComment.content,
+							content: content,
+							coverUrl: post.coverUrl,
+							title: post.title
+						}
+					},
+					isRead: false,
+					createdAt: new Date()
+				})
+				await parentNotification.save()
+			}
 		}
 		await newComment.save()
+		if (post.user.email !== email && !parentId && !parentEmail) {
+			const postNotification = new Notification({
+				recipient: post.user._id,
+				type: 'comment_post',
+				sender: {
+					email: email,
+					nickname: user.nickname,
+					avatar: user.avatar
+				},
+				content: '评论了你的帖子',
+				relatedItem: {
+					itemType: 'post',
+					itemId: post.postId,
+					detail: {
+						title: post.title,
+						coverUrl: post.coverUrl,
+						content: content,
+						author: post.user
+					}
+				},
+				isRead: false,
+				createdAt: new Date()
+			})
+			await postNotification.save()
+		}
 		const updatedComments = await Comment.find({ postId }).lean()
 		const organizedComments = organizeCommentsAfterNew(updatedComments, newComment._id)
 		res.sendSuccess({ message: 'Comment successfully', comments: organizedComments })
@@ -662,6 +767,33 @@ const praiseComment = async (req, res) => {
 				praiseDate: Date.now()
 			})
 			await newPraise.save()
+			const user = await User.findOne({ email })
+			const post = Post.findOne({ postId: comment.postId })
+			if (user.email !== comment.user.email) {
+				const newNotification = new Notification({
+					recipient: comment.user._id,
+					type: 'praise_comment',
+					sender: {
+						email: comment.user.email,
+						nickname: user.nickname,
+						avatar: user.avatar
+					},
+					content: '点赞了你的评论',
+					relatedItem: {
+						itemType: 'comment',
+						itemId: comment._id.toString(),
+						detail: {
+							postId: post.postId,
+							title: post.title,
+							coverUrl: post.coverUrl,
+							content: comment.content
+						}
+					},
+					isRead: false,
+					createdAt: new Date()
+				})
+				await newNotification.save()
+			}
 			await Comment.findByIdAndUpdate(commentId, { $inc: { praiseNum: 1 }, $inc: { rate: 5 } })
 			res.sendSuccess({ message: 'Praised successfully' })
 		}

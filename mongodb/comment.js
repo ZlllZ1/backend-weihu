@@ -9,6 +9,7 @@ const commentSchema = new Schema({
 	content: String,
 	commentDate: { type: Date, default: Date.now },
 	user: {
+		_id: mongoose.Types.ObjectId,
 		email: String,
 		nickname: String,
 		avatar: String,
@@ -37,11 +38,13 @@ commentSchema.pre('save', async function (next) {
 				this.user.nickname = user.nickname
 				this.user.avatar = user.avatar
 				this.user.own = this.user.email === this.postEmail
+				this.user._id = user._id
 			}
 			if (parentUser) {
 				this.parentUser.nickname = parentUser.nickname
 				this.parentUser.avatar = parentUser.avatar
 				this.parentUser.own = this.parentUser.email === this.postEmail
+				this.parentUser._id = parentUser._id
 			}
 		} catch (error) {
 			console.error('Error fetching user info:', error)

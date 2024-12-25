@@ -2,7 +2,6 @@ const Chat = require('../mongodb/chat')
 const User = require('../mongodb/user')
 const Message = require('../mongodb/message')
 const TempUpload = require('../mongodb/tempUpload.js')
-const Notification = require('../mongodb/notification')
 const UserWebSocketManager = require('../utils/userWebsocketManager.js')
 const { v4: uuidv4 } = require('uuid')
 const path = require('path')
@@ -167,17 +166,6 @@ const sendMessages = async (req, res) => {
 				new: true
 			}
 		)
-		const notification = new Notification({
-			recipient: recipientEmail,
-			type: 'message',
-			senderEmail,
-			content: `${senderEmail} 发送了新消息`,
-			relatedItem: {
-				itemType: 'chat',
-				itemId: chatId
-			}
-		})
-		await notification.save()
 		UserWebSocketManager.sendToUser(recipientEmail, {
 			type: 'chat',
 			data: {

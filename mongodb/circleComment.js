@@ -8,6 +8,7 @@ const circleCommentSchema = new Schema({
 	parentEmail: String,
 	content: String,
 	user: {
+		_id: mongoose.Types.ObjectId,
 		email: String,
 		nickname: String,
 		avatar: String,
@@ -34,11 +35,13 @@ circleCommentSchema.pre('save', async function (next) {
 				this.user.nickname = user.nickname
 				this.user.avatar = user.avatar
 				this.user.own = this.user.email === this.postEmail
+				this.user._id = user._id
 			}
 			if (parentUser) {
 				this.parentUser.nickname = parentUser.nickname
 				this.parentUser.avatar = parentUser.avatar
 				this.parentUser.own = this.parentUser.email === this.postEmail
+				this.parentUser._id = parentUser._id
 			}
 		} catch (error) {
 			console.error('Error fetching user info:', error)
