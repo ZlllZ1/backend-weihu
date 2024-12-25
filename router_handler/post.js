@@ -398,29 +398,37 @@ const praisePost = async (req, res) => {
 				User.updateOne({ email: user.email }, { $inc: { praiseNum: 1 } })
 			])
 			if (post.user.email !== user.email) {
-				const newNotification = new Notification({
+				const existingNotification = await Notification.findOne({
 					recipient: post.user._id,
 					type: 'praise_post',
-					sender: {
-						email: user.email,
-						nickname: user.nickname,
-						avatar: user.avatar
-					},
-					content: '点赞了你的帖子',
-					relatedItem: {
-						itemType: 'post',
-						itemId: post.postId,
-						detail: {
-							title: post.title,
-							coverUrl: post.coverUrl,
-							content: post.content,
-							author: post.user
-						}
-					},
-					isRead: false,
-					createdAt: new Date()
+					'sender.email': user.email,
+					'relatedItem.itemId': post.postId
 				})
-				await newNotification.save()
+				if (!existingNotification) {
+					const newNotification = new Notification({
+						recipient: post.user._id,
+						type: 'praise_post',
+						sender: {
+							email: user.email,
+							nickname: user.nickname,
+							avatar: user.avatar
+						},
+						content: '点赞了你的帖子',
+						relatedItem: {
+							itemType: 'post',
+							itemId: post.postId,
+							detail: {
+								title: post.title,
+								coverUrl: post.coverUrl,
+								content: post.content,
+								author: post.user
+							}
+						},
+						isRead: false,
+						createdAt: new Date()
+					})
+					await newNotification.save()
+				}
 			}
 			return res.sendSuccess({ message: 'Praise successfully' })
 		}
@@ -458,29 +466,37 @@ const collectPost = async (req, res) => {
 				User.updateOne({ email: user.email }, { $inc: { collectNum: 1 } })
 			])
 			if (post.user.email !== user.email) {
-				const newNotification = new Notification({
+				const existingNotification = await Notification.findOne({
 					recipient: post.user._id,
 					type: 'collect_post',
-					sender: {
-						email: user.email,
-						nickname: user.nickname,
-						avatar: user.avatar
-					},
-					content: '收藏了你的帖子',
-					relatedItem: {
-						itemType: 'post',
-						itemId: post.postId,
-						detail: {
-							title: post.title,
-							coverUrl: post.coverUrl,
-							content: post.content,
-							author: post.user
-						}
-					},
-					isRead: false,
-					createdAt: new Date()
+					'sender.email': user.email,
+					'relatedItem.itemId': post.postId
 				})
-				await newNotification.save()
+				if (!existingNotification) {
+					const newNotification = new Notification({
+						recipient: post.user._id,
+						type: 'collect_post',
+						sender: {
+							email: user.email,
+							nickname: user.nickname,
+							avatar: user.avatar
+						},
+						content: '收藏了你的帖子',
+						relatedItem: {
+							itemType: 'post',
+							itemId: post.postId,
+							detail: {
+								title: post.title,
+								coverUrl: post.coverUrl,
+								content: post.content,
+								author: post.user
+							}
+						},
+						isRead: false,
+						createdAt: new Date()
+					})
+					await newNotification.save()
+				}
 			}
 			return res.sendSuccess({ message: 'Collect successfully' })
 		}
@@ -770,29 +786,37 @@ const praiseComment = async (req, res) => {
 			const user = await User.findOne({ email })
 			const post = Post.findOne({ postId: comment.postId })
 			if (user.email !== comment.user.email) {
-				const newNotification = new Notification({
+				const existingNotification = await Notification.findOne({
 					recipient: comment.user._id,
 					type: 'praise_comment',
-					sender: {
-						email: comment.user.email,
-						nickname: user.nickname,
-						avatar: user.avatar
-					},
-					content: '点赞了你的评论',
-					relatedItem: {
-						itemType: 'comment',
-						itemId: comment._id.toString(),
-						detail: {
-							postId: post.postId,
-							title: post.title,
-							coverUrl: post.coverUrl,
-							content: comment.content
-						}
-					},
-					isRead: false,
-					createdAt: new Date()
+					'sender.email': user.email,
+					'relatedItem.itemId': comment._id.toString()
 				})
-				await newNotification.save()
+				if (!existingNotification) {
+					const newNotification = new Notification({
+						recipient: comment.user._id,
+						type: 'praise_comment',
+						sender: {
+							email: user.email,
+							nickname: user.nickname,
+							avatar: user.avatar
+						},
+						content: '点赞了你的评论',
+						relatedItem: {
+							itemType: 'comment',
+							itemId: comment._id.toString(),
+							detail: {
+								postId: post.postId,
+								title: post.title,
+								coverUrl: post.coverUrl,
+								content: comment.content
+							}
+						},
+						isRead: false,
+						createdAt: new Date()
+					})
+					await newNotification.save()
+				}
 			}
 			await Comment.findByIdAndUpdate(commentId, { $inc: { praiseNum: 1 }, $inc: { rate: 5 } })
 			res.sendSuccess({ message: 'Praised successfully' })

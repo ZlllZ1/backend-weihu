@@ -243,28 +243,36 @@ const praiseCircle = async (req, res) => {
 			})
 			await newPraise.save()
 			if (circle.user.email !== user.email) {
-				const newNotification = new Notification({
+				const existingNotification = await Notification.findOne({
 					recipient: circle.user._id,
 					type: 'praise_circle',
-					sender: {
-						email: user.email,
-						nickname: user.nickname,
-						avatar: user.avatar
-					},
-					content: '赞了你的朋友圈',
-					relatedItem: {
-						itemType: 'circle',
-						itemId: circle.circleId,
-						detail: {
-							content: circle.content,
-							circleId: circle.circleId,
-							author: circle.user
-						}
-					},
-					isRead: false,
-					createdAt: new Date()
+					'sender.email': user.email,
+					'relatedItem.itemId': circle.circleId
 				})
-				await newNotification.save()
+				if (!existingNotification) {
+					const newNotification = new Notification({
+						recipient: circle.user._id,
+						type: 'praise_circle',
+						sender: {
+							email: user.email,
+							nickname: user.nickname,
+							avatar: user.avatar
+						},
+						content: '赞了你的朋友圈',
+						relatedItem: {
+							itemType: 'circle',
+							itemId: circle.circleId,
+							detail: {
+								content: circle.content,
+								circleId: circle.circleId,
+								author: circle.user
+							}
+						},
+						isRead: false,
+						createdAt: new Date()
+					})
+					await newNotification.save()
+				}
 			}
 			await Circle.updateOne({ circleId: circle.circleId }, { $inc: { praiseNum: 1 } })
 			return res.sendSuccess({ message: 'Praise successfully' })
