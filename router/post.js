@@ -46,4 +46,6 @@ router.post('/deleteComment', postHandler.deleteComment)
 
 router.post('/uploadPostImg', upload.single('postImg'), postHandler.uploadPostImg)
 
+router.post('/search', postHandler.search)
+
 module.exports = router

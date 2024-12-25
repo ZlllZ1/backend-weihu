@@ -14,6 +14,7 @@ const PraiseComment = require('../mongodb/praiseComment.js')
 const { v4: uuidv4 } = require('uuid')
 const TempUpload = require('../mongodb/tempUpload.js')
 const Notification = require('../mongodb/notification.js')
+const nodejieba = require('nodejieba')
 
 const uploadCover = async (req, res) => {
 	const { account } = req.body
@@ -963,6 +964,49 @@ const uploadPostImg = async (req, res) => {
 	}
 }
 
+const search = async (req, res) => {
+	const { searchQuery, type } = req.body
+	const page = parseInt(req.query.page) || 1
+	const limit = parseInt(req.query.limit) || 10
+	const skip = (page - 1) * limit
+	if (!searchQuery) return res.sendError(400, 'searchQuery is required')
+	try {
+		const words = nodejieba.cut(searchQuery)
+		const regex = new RegExp(words.join('|'), 'i')
+		let results, total
+		if (type === 'post') {
+			results = await Post.find({
+				$or: [{ title: regex }, { content: regex }, { introduction: regex }]
+			})
+				.sort({ rate: -1, _id: -1 })
+				.skip(skip)
+				.limit(limit)
+			total = await Post.countDocuments({
+				$or: [{ title: regex }, { content: regex }, { introduction: regex }]
+			})
+		} else if (type === 'user') {
+			results = await User.find({
+				$or: [{ nickname: regex }, { email: regex }, { introduction: regex }]
+			})
+				.sort({ fanNum: -1, _id: -1 })
+				.skip(skip)
+				.limit(limit)
+			total = await User.countDocuments({
+				$or: [{ nickname: regex }, { email: regex }, { introduction: regex }]
+			})
+		} else return res.sendError(400, 'Invalid type')
+		res.sendSuccess({
+			results,
+			page,
+			totalPages: Math.ceil(total / limit),
+			totalResults: total
+		})
+	} catch (error) {
+		console.error('Error in search:', error)
+		res.sendError(500, 'Internal server error')
+	}
+}
+
 module.exports = {
 	uploadCover,
 	publishPost,
@@ -984,5 +1028,6 @@ module.exports = {
 	hidePost,
 	showPost,
 	deleteComment,
-	uploadPostImg
+	uploadPostImg,
+	search
 }
