@@ -966,8 +966,8 @@ const uploadPostImg = async (req, res) => {
 
 const search = async (req, res) => {
 	const { searchQuery, type } = req.body
-	const page = parseInt(req.query.page) || 1
-	const limit = parseInt(req.query.limit) || 10
+	const page = parseInt(req.body.page) || 1
+	const limit = parseInt(req.body.limit) || 30
 	const skip = (page - 1) * limit
 	if (!searchQuery) return res.sendError(400, 'searchQuery is required')
 	try {

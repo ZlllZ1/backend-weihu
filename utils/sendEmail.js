@@ -47,9 +47,7 @@ const transporterQQ = nodemailer.createTransport({
 
 const send163 = mailOptions => {
 	transporter163.sendMail(mailOptions, (error, info) => {
-		if (error) {
-			return console.log(error)
-		}
+		if (error) return console.log(error)
 	})
 }
 
