@@ -3,7 +3,7 @@ const scheduleTasks = require('../utils/task/index.js')
 
 const connectDb = async () => {
 	try {
-		await mongoose.connect('mongodb://127.0.0.1:27017/main')
+		await mongoose.connect('mongodb://root:123456@47.97.251.41:27017/?authSource=weihu-db')
 		scheduleTasks()
 		console.log('数据库连接成功')
 	} catch (error) {
