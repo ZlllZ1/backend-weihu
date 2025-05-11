@@ -53,6 +53,14 @@ commentSchema.pre('save', async function (next) {
 	next()
 })
 
+commentSchema.index({ postId: 1, commentDate: -1 })
+commentSchema.index({ postId: 1, rate: -1 })
+commentSchema.index({ 'user.email': 1, commentDate: -1 })
+commentSchema.index({ parentId: 1 })
+commentSchema.index({ 'parentUser.email': 1 })
+commentSchema.index({ praiseNum: -1 })
+commentSchema.index({ commentDate: -1 })
+
 const Comment = mongoose.model('Comment', commentSchema)
 
 module.exports = Comment

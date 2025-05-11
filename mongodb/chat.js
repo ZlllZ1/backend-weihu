@@ -22,8 +22,20 @@ const chatSchema = new Schema(
 	},
 	{ timestamps: true }
 )
-chatSchema.index({ participants: 1 })
 
+chatSchema.index(
+	{ 'participants.email': 1, 'lastMessage.timestamp': -1 },
+	{ name: 'participants_email_lastMsgTimestamp' }
+)
+
+// 按最后消息时间单独索引（辅助排序）
+chatSchema.index({ 'lastMessage.timestamp': -1 }, { name: 'lastMessage_timestamp' })
+
+// 未读消息数查询索引（按需添加）
+chatSchema.index(
+	{ 'participants.email': 1, 'participants.unreadCount': 1 },
+	{ name: 'email_unreadCount' }
+)
 const Chat = mongoose.model('Chat', chatSchema)
 
 module.exports = Chat

@@ -11,6 +11,12 @@ const messageSchema = new Schema({
 
 messageSchema.index({ chatId: 1, timestamp: -1 })
 
+// 未读消息查询优化
+messageSchema.index({ chatId: 1, isRead: 1, timestamp: -1 })
+
+// 同步消息的时间范围查询
+messageSchema.index({ chatId: 1, timestamp: 1 })
+
 const Message = mongoose.model('Message', messageSchema)
 
 module.exports = Message

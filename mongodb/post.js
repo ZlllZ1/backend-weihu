@@ -22,7 +22,24 @@ const postSchema = new Schema({
 	user: Object
 })
 
+postSchema.index({ email: 1, publishDate: -1 })
+
+// 地区内容推荐
+postSchema.index({ area: 1, publishDate: -1 })
+
+// 标签分类浏览
+postSchema.index({ label: 1, publishDate: -1 })
+
+// 全局最新内容
+postSchema.index({ publishDate: -1 })
+
+// 热门内容排序
 postSchema.index({ rate: -1 })
+postSchema.index({ praiseNum: -1 })
+postSchema.index({ commentNum: -1 })
+
+// 后台管理过滤
+postSchema.index({ show: 1 })
 const Post = mongoose.model('Post', postSchema)
 
 const initCounter = async (sequenceName, startValue = 0) => {

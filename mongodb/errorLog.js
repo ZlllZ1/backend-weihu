@@ -6,6 +6,8 @@ const errorLogSchema = new Schema({
 	createTime: { type: Date, default: Date.now }
 })
 
+errorLogSchema.index({ createTime: -1 })
+
 const ErrorLog = mongoose.model('ErrorLog', errorLogSchema)
 
 module.exports = ErrorLog

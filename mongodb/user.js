@@ -30,6 +30,13 @@ const userSchema = new Schema({
 	setting: { type: mongoose.Schema.Types.ObjectId, ref: 'Setting' }
 })
 
+userSchema.index({ account: 1 }, { unique: true })
+userSchema.index({ email: 1 }, { unique: true })
+userSchema.index({ phone: 1 }, { unique: true })
+userSchema.index({ nickname: 'text' })
+userSchema.index({ live: 1 })
+userSchema.index({ registrationDate: -1 })
+
 const User = mongoose.model('User', userSchema)
 
 module.exports = User

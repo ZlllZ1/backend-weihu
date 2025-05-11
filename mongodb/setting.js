@@ -19,6 +19,8 @@ const settingSchema = new Schema({
 	postLimit: { type: Number, default: 0 }
 })
 
+settingSchema.index({ email: 1 }, { unique: true })
+
 const Setting = mongoose.model('Setting', settingSchema)
 
 module.exports = Setting

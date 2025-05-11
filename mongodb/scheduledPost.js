@@ -21,6 +21,9 @@ const schedulePostSchema = new Schema({
 	user: Object
 })
 
+schedulePostSchema.index({ email: 1, publishDate: -1 })
+schedulePostSchema.index({ publishDate: 1 })
+
 const ScheduledPost = mongoose.model('ScheduledPost', schedulePostSchema)
 
 module.exports = ScheduledPost

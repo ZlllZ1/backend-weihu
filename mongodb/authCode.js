@@ -2,8 +2,8 @@ const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
 const authCodeSchema = new Schema({
-	email: String,
-	code: String,
+	email: { type: String, index: true },
+	code: { type: String, index: true },
 	expires: Number
 })
 

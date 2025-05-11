@@ -23,6 +23,21 @@ const circleCommentSchema = new Schema({
 	publishDate: { type: Date, default: Date.now }
 })
 
+// 1. 按圈子ID + 发布时间排序
+circleCommentSchema.index({ circleId: 1, publishDate: -1 })
+
+// 2. 按用户邮箱查询（用户个人中心展示评论）
+circleCommentSchema.index({ 'user.email': 1 })
+
+// 3. 按父评论ID查询（层级回复结构）
+circleCommentSchema.index({ parentId: 1 })
+
+// 4. 按被回复用户的邮箱查询（用户被提及的评论）
+circleCommentSchema.index({ 'parentUser.email': 1 })
+
+// 5. 按全局时间排序（可选，如果存在全站最新评论列表）
+circleCommentSchema.index({ publishDate: -1 })
+
 circleCommentSchema.pre('save', async function (next) {
 	if (this.isNew) {
 		try {
